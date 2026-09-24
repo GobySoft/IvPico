@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package ivp;
+
+import "google/protobuf/descriptor.proto";
+
+// Levels only raise: an untagged field, message, or enum value inherits the
+// highest level of whatever contains it.
+enum Level
+{
+    CORE = 0;
+    ADVANCED = 1;
+    DEVELOPER = 2;
+}
+
+message FieldOptions
+{
+    Level level = 1;
+}
+
+message EnumValueOptions
+{
+    Level level = 1;
+}
+
+message MessageOptions
+{
+    Level level = 1;
+}
+
+// 50000-99999 is reserved for in-house options
+extend google.protobuf.FieldOptions
+{
+    FieldOptions field = 57400;
+}
+
+extend google.protobuf.EnumValueOptions
+{
+    EnumValueOptions ev = 57400;
+}
+
+extend google.protobuf.MessageOptions
+{
+    MessageOptions msg = 57400;
+}
