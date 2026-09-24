@@ -29,8 +29,8 @@ message Navigation
     optional double latitude = 6;
     optional double longitude = 7;
 
-    optional double heading = 8;
-    optional double speed = 9;
+    optional double heading_true = 8;
+    optional double speed_over_water = 9;
     optional double course_over_ground = 10 [(ivp.field).level = ADVANCED];
     optional double speed_over_ground = 11 [(ivp.field).level = ADVANCED];
     optional double depth = 12;
