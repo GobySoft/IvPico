@@ -204,13 +204,13 @@ message BehaviorEvent
     {
         KIND_UNKNOWN = 0;
         WARNING = 1;
-        WARNING_RETRACTED = 2 [(ivp.ev).level = ADVANCED];
-        ERROR = 3;           // halts the helm
+        ERROR = 2;           // halts the helm
+        WARNING_RETRACTED = 3 [(ivp.ev).level = ADVANCED];
         EVENT = 4 [(ivp.ev).level = ADVANCED];
-        STATUS = 5 [(ivp.ev).level = DEVELOPER];
-        SETTINGS = 6 [(ivp.ev).level = DEVELOPER];
-        CONFIG_WARNING = 7 [(ivp.ev).level = ADVANCED];
-        BAD_CONFIG = 8 [(ivp.ev).level = ADVANCED];
+        CONFIG_WARNING = 5 [(ivp.ev).level = ADVANCED];
+        BAD_CONFIG = 6 [(ivp.ev).level = ADVANCED];
+        STATUS = 7 [(ivp.ev).level = DEVELOPER];
+        SETTINGS = 8 [(ivp.ev).level = DEVELOPER];
     }
     Kind kind = 3;
     string text = 4;
@@ -341,9 +341,9 @@ message Status
         STATE_UNKNOWN = 0;
         DRIVE = 1;
         PARK = 2;
-        STANDBY = 3 [(ivp.ev).level = ADVANCED];
-        DISABLED = 4 [(ivp.ev).level = ADVANCED];
-        MALCONFIG = 5;
+        MALCONFIG = 3;
+        STANDBY = 4 [(ivp.ev).level = ADVANCED];
+        DISABLED = 5 [(ivp.ev).level = ADVANCED];
     }
     State state = 2;
     AllStop allstop = 3;
