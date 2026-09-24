@@ -7,3 +7,11 @@ Rather than using "bridges" or "gateways" to connect middlewares, this project c
 One way to thing of this project is as a generator for the equivalent of the MOOS-based pHelmIvP in your pub/sub middleware of choice.
 
 
+## Repo Structure
+
+- src: Source code
+  - lib: Library source
+    - interfaces: Interface messages (Protobuf)
+  - bin: Binary source
+    - goby: Goby middleware app
+    - ros: ROS middleware node

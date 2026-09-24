@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package ivp.interface;
+
+message Navigation
+{
+    uint64 time = 1;
+
+    oneof source
+    {
+        bool self = 2;
+        string vehicle_name = 3;
+    }
+
+    double heading = 1;
+    double pitch = 2;
+    double roll = 3;
+    double speed = 4;
+    double depth = 5;
+    double altitude = 6;
+    double latitude = 7;
+    double longitude = 8;
+    // equivalent of NAV_X, NAV_Y, etc. and NODE_REPORT
+}
+
+message Solution
+{
+    // DESIRED_HEADING, DESIRED_SPEED, DESIRED_DEPTH, etc.
+
+    uint64 time = 1;
+
+    message Setpoints
+    {
+        double heading = 1;
+        double pitch = 2;
+        double roll = 3;
+        double speed = 4;
+        double depth = 5;
+        double altitude = 6;
+
+        message CustomSetpoint
+        {
+            string domain = 1;
+            double value = 2;
+            string unit = 3;
+        }
+        repeated CustomSetpoint = 7;
+    }
+    Setpoints desired = 2;
+}
+
+message Visualization
+{
+    // equivalent of VIEW_POINT, SEGLIST, POLYGON, etc.
+}
+
+message Status
+{
+    // IVHELM_SUMMARY, STATE , etc.
+}
