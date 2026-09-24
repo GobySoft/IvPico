@@ -2,8 +2,17 @@ syntax = "proto3";
 
 package ivp.interface;
 
+// All "time" fields are microseconds since the UNIX epoch.
+
+// ---------------------------------------------------------------------------
+// Inputs
+// ---------------------------------------------------------------------------
+
 message Navigation
 {
+    // equivalent of NAV_X, NAV_Y, NAV_HEADING, etc. (self) and
+    // NODE_REPORT / AIS_REPORT (other vehicles)
+
     uint64 time = 1;
 
     oneof source
@@ -12,15 +21,111 @@ message Navigation
         string vehicle_name = 3;
     }
 
-    double heading = 1;
-    double pitch = 2;
-    double roll = 3;
-    double speed = 4;
-    double depth = 5;
-    double altitude = 6;
-    double latitude = 7;
-    double longitude = 8;
-    // equivalent of NAV_X, NAV_Y, etc. and NODE_REPORT
+    // local grid (meters); derived from latitude/longitude if unset
+    optional double x = 4;
+    optional double y = 5;
+    optional double latitude = 6;
+    optional double longitude = 7;
+
+    optional double heading = 8;
+    optional double speed = 9;
+    optional double course_over_ground = 10;
+    optional double speed_over_ground = 11;
+    optional double depth = 12;
+    optional double altitude = 13;
+    optional double pitch = 14;
+    optional double roll = 15;
+
+    // matched against behaviors' contact filters (match_type, ignore_group,
+    // etc.)
+    string type = 16;
+    string group = 17;
+    string color = 18;
+    optional double length = 19;
+    optional double beam = 20;
+    // origin of this report, e.g. "ais" or "radar"
+    string vsource = 21;
+}
+
+message Variable
+{
+    // equivalent of any MOOS variable read by behaviors or mode declarations
+    // (conditions, "updates" variables, spawn requests, info variables)
+
+    uint64 time = 1;
+    string key = 2;
+    oneof value
+    {
+        double dval = 3;
+        string sval = 4;
+    }
+}
+
+message Command
+{
+    uint64 time = 1;
+
+    message Restart
+    {
+        enum Type
+        {
+            RESTART_UNKNOWN = 0;
+            REBUILD_BEHAVIORS = 1;      // RESTART_HELM=type1
+            REBUILD_AND_REINITIALIZE = 2;  // RESTART_HELM=type2
+        }
+        Type type = 1;
+    }
+
+    message AbleFilter
+    {
+        // equivalent of BHV_ABLE_FILTER
+        enum Action
+        {
+            ACTION_UNKNOWN = 0;
+            DISABLE = 1;
+            ENABLE = 2;
+            EXPUNGE = 3;
+        }
+        Action action = 1;
+        string contact = 2;
+        string behavior_type = 3;
+        string vsource = 4;
+        string obstacle_id = 5;
+    }
+
+    enum CommsPolicy
+    {
+        COMMS_POLICY_UNKNOWN = 0;
+        OPEN = 1;
+        LEAN = 2;
+        DIRE = 3;
+    }
+
+    oneof command
+    {
+        bool manual_override = 2;       // MOOS_MANUAL_OVERRIDE
+        Restart restart = 3;            // RESTART_HELM
+        bool rejournal = 4;             // IVPHELM_REJOURNAL
+        bool refresh = 5;               // HELM_MAP_CLEAR
+        AbleFilter able_filter = 6;     // BHV_ABLE_FILTER
+        CommsPolicy comms_policy = 7;   // COMMS_POLICY
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Outputs
+// ---------------------------------------------------------------------------
+
+enum AllStop
+{
+    ALLSTOP_UNKNOWN = 0;
+    CLEAR = 1;
+    MANUAL_OVERRIDE = 2;
+    BEHAVIOR_ERROR = 3;
+    NOTHING_TO_DO = 4;
+    NO_GOAL_BEHAVIOR = 5;
+    MISSING_DECISION_VARIABLES = 6;
+    DISABLED_BY_STANDBY_HELM = 7;
 }
 
 message Solution
@@ -28,15 +133,17 @@ message Solution
     // DESIRED_HEADING, DESIRED_SPEED, DESIRED_DEPTH, etc.
 
     uint64 time = 1;
+    uint32 iteration = 2;
 
     message Setpoints
     {
-        double heading = 1;
-        double pitch = 2;
-        double roll = 3;
-        double speed = 4;
-        double depth = 5;
-        double altitude = 6;
+        // unset means no decision was made for that domain variable
+        optional double heading = 1;
+        optional double pitch = 2;
+        optional double roll = 3;
+        optional double speed = 4;
+        optional double depth = 5;
+        optional double altitude = 6;
 
         message CustomSetpoint
         {
@@ -44,17 +151,293 @@ message Solution
             double value = 2;
             string unit = 3;
         }
-        repeated CustomSetpoint = 7;
+        repeated CustomSetpoint custom = 7;
     }
-    Setpoints desired = 2;
+    Setpoints desired = 3;
+
+    // anything but CLEAR means every desired value is zero
+    AllStop allstop = 4;
+}
+
+message Posting
+{
+    // equivalent of the MOOS variables the helm publishes on behalf of
+    // behaviors and the mode set (flags, WPT_STAT, MODE, initialize, etc.)
+
+    uint64 time = 1;
+    uint32 iteration = 2;
+
+    enum Origin
+    {
+        ORIGIN_UNKNOWN = 0;
+        BEHAVIOR = 1;
+        MODE = 2;           // aux "HELM_MODE"
+        INITIALIZE = 3;     // aux "HELM_VAR_INIT"
+        HELM_START = 4;     // aux "HELM_STARTUP_MSG"
+        DEFAULT = 5;
+    }
+    Origin origin = 3;
+    string behavior = 4;
+
+    string key = 5;
+    oneof value
+    {
+        double dval = 6;
+        string sval = 7;
+    }
+}
+
+message BehaviorEvent
+{
+    // equivalent of BHV_WARNING, BHV_ERROR, BHV_EVENT, BHV_STATUS, etc.
+
+    uint64 time = 1;
+    uint32 iteration = 2;
+    string behavior = 3;
+
+    enum Kind
+    {
+        KIND_UNKNOWN = 0;
+        WARNING = 1;
+        WARNING_RETRACTED = 2;
+        ERROR = 3;           // halts the helm
+        EVENT = 4;
+        STATUS = 5;
+        SETTINGS = 6;
+        CONFIG_WARNING = 7;
+        BAD_CONFIG = 8;
+    }
+    Kind kind = 4;
+    string text = 5;
+}
+
+message ObjectiveFunction
+{
+    // equivalent of BHV_IPF
+
+    uint64 time = 1;
+    uint32 iteration = 2;
+    string behavior = 3;
+    // FunctionEncoder string (IvPFunctionToString)
+    string encoding = 4;
+}
+
+message OffboardMessage
+{
+    // equivalent of NODE_MESSAGE_LOCAL
+
+    uint64 time = 1;
+    string source_node = 2;
+    string source_app = 3;
+    string source_behavior = 4;
+    string destination_node = 5;
+    string destination_group = 6;
+    string key = 7;
+    oneof value
+    {
+        double dval = 8;
+        string sval = 9;
+    }
+    string color = 10;
+    string message_id = 11;
+    bool ack_requested = 12;
 }
 
 message Visualization
 {
-    // equivalent of VIEW_POINT, SEGLIST, POLYGON, etc.
+    // equivalent of VIEW_POINT, VIEW_SEGLIST, VIEW_POLYGON, VIEW_SEGLR
+
+    uint64 time = 1;
+    uint32 iteration = 2;
+    string behavior = 3;
+
+    message Point
+    {
+        double x = 1;
+        double y = 2;
+        optional double z = 3;
+    }
+    message SegList
+    {
+        repeated Point vertex = 1;
+    }
+    message Polygon
+    {
+        repeated Point vertex = 1;
+    }
+    message Seglr
+    {
+        repeated Point vertex = 1;
+        double ray_angle = 2;
+        optional double ray_length = 3;
+        optional double head_size = 4;
+    }
+    oneof shape
+    {
+        Point point = 4;
+        SegList seglist = 5;
+        Polygon polygon = 6;
+        Seglr seglr = 7;
+    }
+
+    string label = 10;
+    string id = 11;
+    // false erases a previously drawn shape with the same label
+    bool active = 12;
+    optional double duration = 13;
+    string message = 14;
+
+    string vertex_color = 20;
+    string edge_color = 21;
+    string label_color = 22;
+    string fill_color = 23;
+    optional double vertex_size = 24;
+    optional double edge_size = 25;
+    optional double transparency = 26;
+}
+
+message LifeEvent
+{
+    // equivalent of IVPHELM_LIFE_EVENT
+
+    uint64 time = 1;
+    uint32 iteration = 2;
+
+    enum Type
+    {
+        TYPE_UNKNOWN = 0;
+        SPAWN = 1;
+        DEATH = 2;
+        ABORT = 3;
+    }
+    Type type = 3;
+    string behavior = 4;
+    string behavior_type = 5;
+    string spawn_string = 6;
+    string post_mortem = 7;
 }
 
 message Status
 {
-    // IVHELM_SUMMARY, STATE , etc.
+    // IVPHELM_STATE, IVPHELM_ALLSTOP, IVPHELM_SUMMARY, IVPHELM_BHV_*, etc.
+
+    uint64 time = 1;
+    uint32 iteration = 2;
+
+    enum State
+    {
+        STATE_UNKNOWN = 0;
+        DRIVE = 1;
+        PARK = 2;
+        STANDBY = 3;
+        DISABLED = 4;
+        MALCONFIG = 5;
+    }
+    State state = 3;
+    // "+" suffix on IVPHELM_STATE
+    bool standby_helm = 4;
+
+    AllStop allstop = 5;
+    repeated string missing_decision_variables = 6;
+    string halt_message = 7;
+
+    message Mode
+    {
+        string variable = 1;
+        // colon-joined path, e.g. "ACTIVE:SURVEYING"
+        string value = 2;
+    }
+    repeated Mode mode = 8;
+
+    message Behavior
+    {
+        string name = 1;
+        string type = 2;
+
+        enum RunState
+        {
+            RUN_STATE_UNKNOWN = 0;
+            IDLE = 1;
+            RUNNING = 2;
+            ACTIVE = 3;
+            COMPLETED = 4;
+            DISABLED = 5;
+        }
+        RunState run_state = 3;
+        uint64 state_time_entered = 4;
+        string update_summary = 5;
+
+        // set only when ACTIVE
+        optional double priority_weight = 6;
+        optional uint32 pieces = 7;
+        optional double create_cpu = 8;
+        string mode = 9;
+        string submode = 10;
+    }
+    repeated Behavior behavior = 9;
+    uint32 behavior_count = 10;
+    uint32 behavior_count_ever = 11;
+    uint32 completed_count = 12;
+    bool completed_pending = 13;
+
+    uint32 objective_function_count = 14;
+    uint32 total_pieces_formed = 15;
+    uint32 total_pieces_cached = 16;
+    double create_cpu = 17;
+    double solve_cpu = 18;
+    double loop_cpu = 19;
+    double max_create_cpu = 20;
+    double max_solve_cpu = 21;
+    double max_loop_cpu = 22;
+    double cpu_load = 23;
+    optional double turn_rate = 24;
+
+    message UpdateResult
+    {
+        string behavior = 1;
+        string variable = 2;
+        enum Result
+        {
+            RESULT_UNKNOWN = 0;
+            SUCCESS = 1;
+            DUPLICATE = 2;
+            NAME_MISMATCH = 3;
+            PARAM_ERROR = 4;
+        }
+        Result result = 3;
+    }
+    repeated UpdateResult update_result = 25;
+
+    repeated string contact = 26;
+    uint32 warning_count = 27;
+}
+
+message Configuration
+{
+    // IVPHELM_DOMAIN, IVPHELM_MODESET, IVPHELM_STATEVARS, IVPHELM_UPDATEVARS,
+    // IVPHELM_REGISTER; published at startup and on change
+
+    uint64 time = 1;
+    string alias = 2;
+
+    message Domain
+    {
+        string name = 1;
+        double low = 2;
+        double high = 3;
+        uint32 points = 4;
+        bool optional_decision = 5;
+    }
+    repeated Domain domain = 3;
+
+    string mode_set = 4;
+    repeated string state_variable = 5;
+
+    message UpdateVariable
+    {
+        string behavior = 1;
+        string variable = 2;
+    }
+    repeated UpdateVariable update_variable = 6;
+    repeated string subscription = 7;
 }
