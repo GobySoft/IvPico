@@ -31,9 +31,10 @@ message Navigation
 
     optional double heading_true = 8;
     optional double speed_over_water = 9;
-    optional double course_over_ground = 10 [(ivp.field).level = ADVANCED];
-    optional double speed_over_ground = 11 [(ivp.field).level = ADVANCED];
-    optional double depth = 12;
+    optional double depth = 10;
+
+    optional double course_over_ground = 11 [(ivp.field).level = ADVANCED];
+    optional double speed_over_ground = 12 [(ivp.field).level = ADVANCED];
     optional double altitude = 13 [(ivp.field).level = ADVANCED];
     optional double pitch = 14 [(ivp.field).level = ADVANCED];
     optional double roll = 15 [(ivp.field).level = ADVANCED];
@@ -105,12 +106,12 @@ message Command
 
     oneof command
     {
-        bool manual_override = 2;       // MOOS_MANUAL_OVERRIDE
-        Restart restart = 3 [(ivp.field).level = ADVANCED];            // RESTART_HELM
-        bool rejournal = 4 [(ivp.field).level = DEVELOPER];             // IVPHELM_REJOURNAL
-        bool refresh = 5 [(ivp.field).level = ADVANCED];               // HELM_MAP_CLEAR
-        AbleFilter able_filter = 6 [(ivp.field).level = ADVANCED];     // BHV_ABLE_FILTER
-        CommsPolicy comms_policy = 7 [(ivp.field).level = ADVANCED];   // COMMS_POLICY
+        bool manual_override = 2;  // MOOS_MANUAL_OVERRIDE
+        Restart restart = 3 [(ivp.field).level = ADVANCED];  // RESTART_HELM
+        bool refresh = 4 [(ivp.field).level = ADVANCED];  // HELM_MAP_CLEAR
+        AbleFilter able_filter = 5 [(ivp.field).level = ADVANCED];  // BHV_ABLE_FILTER
+        CommsPolicy comms_policy = 6 [(ivp.field).level = ADVANCED];  // COMMS_POLICY
+        bool rejournal = 7 [(ivp.field).level = DEVELOPER];  // IVPHELM_REJOURNAL
     }
 }
 
@@ -135,16 +136,16 @@ message Solution
     // DESIRED_HEADING, DESIRED_SPEED, DESIRED_DEPTH, etc.
 
     uint64 time = 1;
-    uint32 iteration = 2 [(ivp.field).level = DEVELOPER];
 
     message Setpoints
     {
         // unset means no decision was made for that domain variable
         optional double heading = 1;
-        optional double pitch = 2 [(ivp.field).level = ADVANCED];
-        optional double roll = 3 [(ivp.field).level = ADVANCED];
-        optional double speed = 4;
-        optional double depth = 5;
+        optional double speed = 2;
+        optional double depth = 3;
+
+        optional double pitch = 4 [(ivp.field).level = ADVANCED];
+        optional double roll = 5 [(ivp.field).level = ADVANCED];
         optional double altitude = 6 [(ivp.field).level = ADVANCED];
 
         message CustomSetpoint
@@ -155,10 +156,12 @@ message Solution
         }
         repeated CustomSetpoint custom = 7 [(ivp.field).level = ADVANCED];
     }
-    Setpoints desired = 3;
+    Setpoints desired = 2;
 
     // anything but CLEAR means every desired value is zero
-    AllStop allstop = 4;
+    AllStop allstop = 3;
+
+    uint32 iteration = 4 [(ivp.field).level = DEVELOPER];
 }
 
 message Posting
@@ -167,7 +170,6 @@ message Posting
     // behaviors and the mode set (flags, WPT_STAT, MODE, initialize, etc.)
 
     uint64 time = 1;
-    uint32 iteration = 2 [(ivp.field).level = DEVELOPER];
 
     enum Origin
     {
@@ -178,15 +180,17 @@ message Posting
         HELM_START = 4 [(ivp.ev).level = ADVANCED];     // aux "HELM_STARTUP_MSG"
         DEFAULT = 5 [(ivp.ev).level = ADVANCED];
     }
-    Origin origin = 3;
-    string behavior = 4;
+    Origin origin = 2;
+    string behavior = 3;
 
-    string key = 5;
+    string key = 4;
     oneof value
     {
-        double dval = 6;
-        string sval = 7;
+        double dval = 5;
+        string sval = 6;
     }
+
+    uint32 iteration = 7 [(ivp.field).level = DEVELOPER];
 }
 
 message BehaviorEvent
@@ -194,8 +198,7 @@ message BehaviorEvent
     // equivalent of BHV_WARNING, BHV_ERROR, BHV_EVENT, BHV_STATUS, etc.
 
     uint64 time = 1;
-    uint32 iteration = 2 [(ivp.field).level = DEVELOPER];
-    string behavior = 3;
+    string behavior = 2;
 
     enum Kind
     {
@@ -209,8 +212,10 @@ message BehaviorEvent
         CONFIG_WARNING = 7 [(ivp.ev).level = ADVANCED];
         BAD_CONFIG = 8 [(ivp.ev).level = ADVANCED];
     }
-    Kind kind = 4;
-    string text = 5;
+    Kind kind = 3;
+    string text = 4;
+
+    uint32 iteration = 5 [(ivp.field).level = DEVELOPER];
 }
 
 message ObjectiveFunction
@@ -220,10 +225,11 @@ message ObjectiveFunction
     // equivalent of BHV_IPF
 
     uint64 time = 1;
-    uint32 iteration = 2 [(ivp.field).level = DEVELOPER];
-    string behavior = 3;
+    string behavior = 2;
     // FunctionEncoder string (IvPFunctionToString)
-    string encoding = 4;
+    string encoding = 3;
+
+    uint32 iteration = 4 [(ivp.field).level = DEVELOPER];
 }
 
 message OffboardMessage
@@ -232,16 +238,17 @@ message OffboardMessage
 
     uint64 time = 1;
     string source_node = 2;
-    string source_app = 3 [(ivp.field).level = ADVANCED];
-    string source_behavior = 4 [(ivp.field).level = ADVANCED];
-    string destination_node = 5;
-    string destination_group = 6;
-    string key = 7;
+    string destination_node = 3;
+    string destination_group = 4;
+    string key = 5;
     oneof value
     {
-        double dval = 8;
-        string sval = 9;
+        double dval = 6;
+        string sval = 7;
     }
+
+    string source_app = 8 [(ivp.field).level = ADVANCED];
+    string source_behavior = 9 [(ivp.field).level = ADVANCED];
     string color = 10 [(ivp.field).level = ADVANCED];
     string message_id = 11 [(ivp.field).level = ADVANCED];
     bool ack_requested = 12 [(ivp.field).level = ADVANCED];
@@ -252,8 +259,10 @@ message Visualization
     // equivalent of VIEW_POINT, VIEW_SEGLIST, VIEW_POLYGON, VIEW_SEGLR
 
     uint64 time = 1;
-    uint32 iteration = 2 [(ivp.field).level = DEVELOPER];
-    string behavior = 3;
+    string behavior = 2;
+    string label = 3;
+    // false erases a previously drawn shape with the same label
+    bool active = 4;
 
     message Point
     {
@@ -278,26 +287,24 @@ message Visualization
     }
     oneof shape
     {
-        Point point = 4;
-        SegList seglist = 5;
-        Polygon polygon = 6;
-        Seglr seglr = 7 [(ivp.field).level = ADVANCED];
+        Point point = 5;
+        SegList seglist = 6;
+        Polygon polygon = 7;
+        Seglr seglr = 8 [(ivp.field).level = ADVANCED];
     }
 
-    string label = 10;
-    string id = 11 [(ivp.field).level = ADVANCED];
-    // false erases a previously drawn shape with the same label
-    bool active = 12;
-    optional double duration = 13 [(ivp.field).level = ADVANCED];
-    string message = 14 [(ivp.field).level = ADVANCED];
+    string id = 9 [(ivp.field).level = ADVANCED];
+    optional double duration = 10 [(ivp.field).level = ADVANCED];
+    string message = 11 [(ivp.field).level = ADVANCED];
+    string vertex_color = 12 [(ivp.field).level = ADVANCED];
+    string edge_color = 13 [(ivp.field).level = ADVANCED];
+    string label_color = 14 [(ivp.field).level = ADVANCED];
+    string fill_color = 15 [(ivp.field).level = ADVANCED];
+    optional double vertex_size = 16 [(ivp.field).level = ADVANCED];
+    optional double edge_size = 17 [(ivp.field).level = ADVANCED];
+    optional double transparency = 18 [(ivp.field).level = ADVANCED];
 
-    string vertex_color = 20 [(ivp.field).level = ADVANCED];
-    string edge_color = 21 [(ivp.field).level = ADVANCED];
-    string label_color = 22 [(ivp.field).level = ADVANCED];
-    string fill_color = 23 [(ivp.field).level = ADVANCED];
-    optional double vertex_size = 24 [(ivp.field).level = ADVANCED];
-    optional double edge_size = 25 [(ivp.field).level = ADVANCED];
-    optional double transparency = 26 [(ivp.field).level = ADVANCED];
+    uint32 iteration = 19 [(ivp.field).level = DEVELOPER];
 }
 
 message LifeEvent
@@ -305,7 +312,6 @@ message LifeEvent
     // equivalent of IVPHELM_LIFE_EVENT
 
     uint64 time = 1;
-    uint32 iteration = 2 [(ivp.field).level = DEVELOPER];
 
     enum Type
     {
@@ -314,11 +320,14 @@ message LifeEvent
         DEATH = 2;
         ABORT = 3 [(ivp.ev).level = ADVANCED];
     }
-    Type type = 3;
-    string behavior = 4;
-    string behavior_type = 5;
-    string spawn_string = 6 [(ivp.field).level = ADVANCED];
-    string post_mortem = 7 [(ivp.field).level = ADVANCED];
+    Type type = 2;
+    string behavior = 3;
+    string behavior_type = 4;
+
+    string spawn_string = 5 [(ivp.field).level = ADVANCED];
+    string post_mortem = 6 [(ivp.field).level = ADVANCED];
+
+    uint32 iteration = 7 [(ivp.field).level = DEVELOPER];
 }
 
 message Status
@@ -326,7 +335,6 @@ message Status
     // IVPHELM_STATE, IVPHELM_ALLSTOP, IVPHELM_SUMMARY, IVPHELM_BHV_*, etc.
 
     uint64 time = 1;
-    uint32 iteration = 2 [(ivp.field).level = DEVELOPER];
 
     enum State
     {
@@ -337,13 +345,8 @@ message Status
         DISABLED = 4 [(ivp.ev).level = ADVANCED];
         MALCONFIG = 5;
     }
-    State state = 3;
-    // "+" suffix on IVPHELM_STATE
-    bool standby_helm = 4 [(ivp.field).level = ADVANCED];
-
-    AllStop allstop = 5;
-    repeated string missing_decision_variables = 6 [(ivp.field).level = ADVANCED];
-    string halt_message = 7 [(ivp.field).level = ADVANCED];
+    State state = 2;
+    AllStop allstop = 3;
 
     message Mode
     {
@@ -351,7 +354,12 @@ message Status
         // colon-joined path, e.g. "ACTIVE:SURVEYING"
         string value = 2;
     }
-    repeated Mode mode = 8;
+    repeated Mode mode = 4;
+
+    // "+" suffix on IVPHELM_STATE
+    bool standby_helm = 5 [(ivp.field).level = ADVANCED];
+    repeated string missing_decision_variables = 6 [(ivp.field).level = ADVANCED];
+    string halt_message = 7 [(ivp.field).level = ADVANCED];
 
     message Behavior
     {
@@ -369,32 +377,35 @@ message Status
         }
         RunState run_state = 3;
         uint64 state_time_entered = 4;
-        string update_summary = 5 [(ivp.field).level = DEVELOPER];
+        string mode = 5;
+        string submode = 6;
 
+        string update_summary = 7 [(ivp.field).level = DEVELOPER];
         // set only when ACTIVE
-        optional double priority_weight = 6 [(ivp.field).level = DEVELOPER];
-        optional uint32 pieces = 7 [(ivp.field).level = DEVELOPER];
-        optional double create_cpu = 8 [(ivp.field).level = DEVELOPER];
-        string mode = 9;
-        string submode = 10;
+        optional double priority_weight = 8 [(ivp.field).level = DEVELOPER];
+        optional uint32 pieces = 9 [(ivp.field).level = DEVELOPER];
+        optional double create_cpu = 10 [(ivp.field).level = DEVELOPER];
     }
-    repeated Behavior behavior = 9 [(ivp.field).level = ADVANCED];
-    uint32 behavior_count = 10 [(ivp.field).level = DEVELOPER];
-    uint32 behavior_count_ever = 11 [(ivp.field).level = DEVELOPER];
-    uint32 completed_count = 12 [(ivp.field).level = DEVELOPER];
-    bool completed_pending = 13 [(ivp.field).level = DEVELOPER];
+    repeated Behavior behavior = 8 [(ivp.field).level = ADVANCED];
+    optional double turn_rate = 9 [(ivp.field).level = ADVANCED];
+    repeated string contact = 10 [(ivp.field).level = ADVANCED];
+    uint32 warning_count = 11 [(ivp.field).level = ADVANCED];
 
-    uint32 objective_function_count = 14 [(ivp.field).level = DEVELOPER];
-    uint32 total_pieces_formed = 15 [(ivp.field).level = DEVELOPER];
-    uint32 total_pieces_cached = 16 [(ivp.field).level = DEVELOPER];
-    double create_cpu = 17 [(ivp.field).level = DEVELOPER];
-    double solve_cpu = 18 [(ivp.field).level = DEVELOPER];
-    double loop_cpu = 19 [(ivp.field).level = DEVELOPER];
-    double max_create_cpu = 20 [(ivp.field).level = DEVELOPER];
-    double max_solve_cpu = 21 [(ivp.field).level = DEVELOPER];
-    double max_loop_cpu = 22 [(ivp.field).level = DEVELOPER];
-    double cpu_load = 23 [(ivp.field).level = DEVELOPER];
-    optional double turn_rate = 24 [(ivp.field).level = ADVANCED];
+    uint32 iteration = 12 [(ivp.field).level = DEVELOPER];
+    uint32 behavior_count = 13 [(ivp.field).level = DEVELOPER];
+    uint32 behavior_count_ever = 14 [(ivp.field).level = DEVELOPER];
+    uint32 completed_count = 15 [(ivp.field).level = DEVELOPER];
+    bool completed_pending = 16 [(ivp.field).level = DEVELOPER];
+    uint32 objective_function_count = 17 [(ivp.field).level = DEVELOPER];
+    uint32 total_pieces_formed = 18 [(ivp.field).level = DEVELOPER];
+    uint32 total_pieces_cached = 19 [(ivp.field).level = DEVELOPER];
+    double create_cpu = 20 [(ivp.field).level = DEVELOPER];
+    double solve_cpu = 21 [(ivp.field).level = DEVELOPER];
+    double loop_cpu = 22 [(ivp.field).level = DEVELOPER];
+    double max_create_cpu = 23 [(ivp.field).level = DEVELOPER];
+    double max_solve_cpu = 24 [(ivp.field).level = DEVELOPER];
+    double max_loop_cpu = 25 [(ivp.field).level = DEVELOPER];
+    double cpu_load = 26 [(ivp.field).level = DEVELOPER];
 
     message UpdateResult
     {
@@ -410,10 +421,7 @@ message Status
         }
         Result result = 3;
     }
-    repeated UpdateResult update_result = 25 [(ivp.field).level = DEVELOPER];
-
-    repeated string contact = 26 [(ivp.field).level = ADVANCED];
-    uint32 warning_count = 27 [(ivp.field).level = ADVANCED];
+    repeated UpdateResult update_result = 27 [(ivp.field).level = DEVELOPER];
 }
 
 message Configuration
