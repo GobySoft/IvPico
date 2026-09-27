@@ -2,59 +2,423 @@ syntax = "proto3";
 
 package ivp.interface;
 
+import "interface/options.proto";
+import "openocean/messages/control.proto";
+import "openocean/messages/navigation.proto";
+
+// All "time" fields are microseconds since the UNIX epoch.
+//
+// openocean messages are in SI units (angles in radians), so values are converted to and from
+// MOOS's degrees at the helm.
+
+// ---------------------------------------------------------------------------
+// Inputs
+// ---------------------------------------------------------------------------
+
 message Navigation
 {
-    uint64 time = 1;
+    // equivalent of NAV_X, NAV_Y, NAV_HEADING, etc. (self) and
+    // NODE_REPORT / AIS_REPORT (other vehicles)
 
-    oneof source
+    // NAV_X, NAV_Y are nav.enu.e, nav.enu.n, derived from nav.geodetic if unset.
+    // Other vehicles are named by nav.vehicle.name.
+    openocean.Navigation nav = 1;
+    bool self = 2;
+
+    // matched against behaviors' contact filters (match_type, ignore_group,
+    // etc.)
+    string type = 100 [(ivp.field).level = ADVANCED];
+    string group = 101 [(ivp.field).level = ADVANCED];
+    string color = 102 [(ivp.field).level = ADVANCED];
+    optional double length = 103 [(ivp.field).level = ADVANCED];
+    optional double beam = 104 [(ivp.field).level = ADVANCED];
+    // origin of this report, e.g. "ais" or "radar"
+    string vsource = 105 [(ivp.field).level = ADVANCED];
+}
+
+message Variable
+{
+    // equivalent of any MOOS variable read by behaviors or mode declarations
+    // (conditions, "updates" variables, spawn requests, info variables)
+
+    int64 time = 1;
+    string key = 2;
+    oneof value
     {
-        bool self = 2;
-        string vehicle_name = 3;
+        double dval = 3;
+        string sval = 4;
+    }
+}
+
+message Command
+{
+    int64 time = 1;
+
+    message Restart
+    {
+        enum Type
+        {
+            RESTART_UNKNOWN = 0;
+            REBUILD_BEHAVIORS = 1;      // RESTART_HELM=type1
+            REBUILD_AND_REINITIALIZE = 2;  // RESTART_HELM=type2
+        }
+        Type type = 1;
     }
 
-    double heading = 1;
-    double pitch = 2;
-    double roll = 3;
-    double speed = 4;
-    double depth = 5;
-    double altitude = 6;
-    double latitude = 7;
-    double longitude = 8;
-    // equivalent of NAV_X, NAV_Y, etc. and NODE_REPORT
+    message AbleFilter
+    {
+        // equivalent of BHV_ABLE_FILTER
+        enum Action
+        {
+            ACTION_UNKNOWN = 0;
+            DISABLE = 1;
+            ENABLE = 2;
+            EXPUNGE = 100 [(ivp.ev).level = ADVANCED];
+        }
+        Action action = 1;
+        string contact = 2;
+        string behavior_type = 3;
+        string vsource = 4;
+        string obstacle_id = 5;
+    }
+
+    enum CommsPolicy
+    {
+        COMMS_POLICY_UNKNOWN = 0;
+        OPEN = 1;
+        LEAN = 2;
+        DIRE = 3;
+    }
+
+    oneof command
+    {
+        bool manual_override = 2;  // MOOS_MANUAL_OVERRIDE
+        Restart restart = 100 [(ivp.field).level = ADVANCED];  // RESTART_HELM
+        bool refresh = 101 [(ivp.field).level = ADVANCED];  // HELM_MAP_CLEAR
+        AbleFilter able_filter = 102 [(ivp.field).level = ADVANCED];  // BHV_ABLE_FILTER
+        CommsPolicy comms_policy = 103 [(ivp.field).level = ADVANCED];  // COMMS_POLICY
+        bool rejournal = 200 [(ivp.field).level = DEVELOPER];  // IVPHELM_REJOURNAL
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Outputs
+// ---------------------------------------------------------------------------
+
+enum AllStop
+{
+    ALLSTOP_UNKNOWN = 0;
+    CLEAR = 1;
+    MANUAL_OVERRIDE = 2;
+    BEHAVIOR_ERROR = 3;
+    NOTHING_TO_DO = 4;
+    NO_GOAL_BEHAVIOR = 100 [(ivp.ev).level = ADVANCED];
+    MISSING_DECISION_VARIABLES = 101 [(ivp.ev).level = ADVANCED];
+    DISABLED_BY_STANDBY_HELM = 102 [(ivp.ev).level = ADVANCED];
 }
 
 message Solution
 {
     // DESIRED_HEADING, DESIRED_SPEED, DESIRED_DEPTH, etc.
 
-    uint64 time = 1;
+    // desired.time is the solution's time; an unset field means no decision
+    // was made for that domain variable
+    openocean.ControlSetpoint desired = 1;
 
-    message Setpoints
+    // anything but CLEAR means every desired value is zero
+    AllStop allstop = 2;
+
+    uint32 iteration = 200 [(ivp.field).level = DEVELOPER];
+}
+
+message Posting
+{
+    // equivalent of the MOOS variables the helm publishes on behalf of
+    // behaviors and the mode set (flags, WPT_STAT, MODE, initialize, etc.)
+
+    int64 time = 1;
+
+    enum Origin
     {
-        double heading = 1;
-        double pitch = 2;
-        double roll = 3;
-        double speed = 4;
-        double depth = 5;
-        double altitude = 6;
-
-        message CustomSetpoint
-        {
-            string domain = 1;
-            double value = 2;
-            string unit = 3;
-        }
-        repeated CustomSetpoint = 7;
+        ORIGIN_UNKNOWN = 0;
+        BEHAVIOR = 1;
+        MODE = 2;           // aux "HELM_MODE"
+        INITIALIZE = 3;     // aux "HELM_VAR_INIT"
+        HELM_START = 100 [(ivp.ev).level = ADVANCED];     // aux "HELM_STARTUP_MSG"
+        DEFAULT = 101 [(ivp.ev).level = ADVANCED];
     }
-    Setpoints desired = 2;
+    Origin origin = 2;
+    string behavior = 3;
+
+    string key = 4;
+    oneof value
+    {
+        double dval = 5;
+        string sval = 6;
+    }
+
+    uint32 iteration = 200 [(ivp.field).level = DEVELOPER];
+}
+
+message BehaviorEvent
+{
+    // equivalent of BHV_WARNING, BHV_ERROR, BHV_EVENT, BHV_STATUS, etc.
+
+    int64 time = 1;
+    string behavior = 2;
+
+    enum Kind
+    {
+        KIND_UNKNOWN = 0;
+        WARNING = 1;
+        ERROR = 2;           // halts the helm
+        WARNING_RETRACTED = 100 [(ivp.ev).level = ADVANCED];
+        EVENT = 101 [(ivp.ev).level = ADVANCED];
+        CONFIG_WARNING = 102 [(ivp.ev).level = ADVANCED];
+        BAD_CONFIG = 103 [(ivp.ev).level = ADVANCED];
+        STATUS = 200 [(ivp.ev).level = DEVELOPER];
+        SETTINGS = 201 [(ivp.ev).level = DEVELOPER];
+    }
+    Kind kind = 3;
+    string text = 4;
+
+    uint32 iteration = 200 [(ivp.field).level = DEVELOPER];
+}
+
+message ObjectiveFunction
+{
+    option (ivp.msg).level = DEVELOPER;
+
+    // equivalent of BHV_IPF
+
+    int64 time = 1;
+    string behavior = 2;
+    // FunctionEncoder string (IvPFunctionToString)
+    string encoding = 3;
+
+    uint32 iteration = 200 [(ivp.field).level = DEVELOPER];
+}
+
+message OffboardMessage
+{
+    // equivalent of NODE_MESSAGE_LOCAL
+
+    int64 time = 1;
+    string source_node = 2;
+    string destination_node = 3;
+    string destination_group = 4;
+    string key = 5;
+    oneof value
+    {
+        double dval = 6;
+        string sval = 7;
+    }
+
+    string source_app = 100 [(ivp.field).level = ADVANCED];
+    string source_behavior = 101 [(ivp.field).level = ADVANCED];
+    string color = 102 [(ivp.field).level = ADVANCED];
+    string message_id = 103 [(ivp.field).level = ADVANCED];
+    bool ack_requested = 104 [(ivp.field).level = ADVANCED];
 }
 
 message Visualization
 {
-    // equivalent of VIEW_POINT, SEGLIST, POLYGON, etc.
+    // equivalent of VIEW_POINT, VIEW_SEGLIST, VIEW_POLYGON, VIEW_SEGLR
+
+    int64 time = 1;
+    string behavior = 2;
+    string label = 3;
+    // false erases a previously drawn shape with the same label
+    bool active = 4;
+
+    message Point
+    {
+        double x = 1;
+        double y = 2;
+        optional double z = 100 [(ivp.field).level = ADVANCED];
+    }
+    message SegList
+    {
+        repeated Point vertex = 1;
+    }
+    message Polygon
+    {
+        repeated Point vertex = 1;
+    }
+    message Seglr
+    {
+        repeated Point vertex = 1;
+        double ray_angle = 2;
+        optional double ray_length = 3;
+        optional double head_size = 4;
+    }
+    oneof shape
+    {
+        Point point = 5;
+        SegList seglist = 6;
+        Polygon polygon = 7;
+        Seglr seglr = 100 [(ivp.field).level = ADVANCED];
+    }
+
+    string id = 101 [(ivp.field).level = ADVANCED];
+    optional double duration = 102 [(ivp.field).level = ADVANCED];
+    string message = 103 [(ivp.field).level = ADVANCED];
+    string vertex_color = 104 [(ivp.field).level = ADVANCED];
+    string edge_color = 105 [(ivp.field).level = ADVANCED];
+    string label_color = 106 [(ivp.field).level = ADVANCED];
+    string fill_color = 107 [(ivp.field).level = ADVANCED];
+    optional double vertex_size = 108 [(ivp.field).level = ADVANCED];
+    optional double edge_size = 109 [(ivp.field).level = ADVANCED];
+    optional double transparency = 110 [(ivp.field).level = ADVANCED];
+
+    uint32 iteration = 200 [(ivp.field).level = DEVELOPER];
+}
+
+message LifeEvent
+{
+    // equivalent of IVPHELM_LIFE_EVENT
+
+    int64 time = 1;
+
+    enum Type
+    {
+        TYPE_UNKNOWN = 0;
+        SPAWN = 1;
+        DEATH = 2;
+        ABORT = 100 [(ivp.ev).level = ADVANCED];
+    }
+    Type type = 2;
+    string behavior = 3;
+    string behavior_type = 4;
+
+    string spawn_string = 100 [(ivp.field).level = ADVANCED];
+    string post_mortem = 101 [(ivp.field).level = ADVANCED];
+
+    uint32 iteration = 200 [(ivp.field).level = DEVELOPER];
 }
 
 message Status
 {
-    // IVHELM_SUMMARY, STATE , etc.
+    // IVPHELM_STATE, IVPHELM_ALLSTOP, IVPHELM_SUMMARY, IVPHELM_BHV_*, etc.
+
+    int64 time = 1;
+
+    enum State
+    {
+        STATE_UNKNOWN = 0;
+        DRIVE = 1;
+        PARK = 2;
+        MALCONFIG = 3;
+        STANDBY = 100 [(ivp.ev).level = ADVANCED];
+        DISABLED = 101 [(ivp.ev).level = ADVANCED];
+    }
+    State state = 2;
+    AllStop allstop = 3;
+
+    message Mode
+    {
+        string variable = 1;
+        // colon-joined path, e.g. "ACTIVE:SURVEYING"
+        string value = 2;
+    }
+    repeated Mode mode = 4;
+
+    // "+" suffix on IVPHELM_STATE
+    bool standby_helm = 100 [(ivp.field).level = ADVANCED];
+    repeated string missing_decision_variables = 101 [(ivp.field).level = ADVANCED];
+    string halt_message = 102 [(ivp.field).level = ADVANCED];
+
+    message Behavior
+    {
+        string name = 1;
+        string type = 2;
+
+        enum RunState
+        {
+            RUN_STATE_UNKNOWN = 0;
+            IDLE = 1;
+            RUNNING = 2;
+            ACTIVE = 3;
+            COMPLETED = 4;
+            DISABLED = 100 [(ivp.ev).level = ADVANCED];
+        }
+        RunState run_state = 3;
+        int64 state_time_entered = 4;
+        string mode = 5;
+        string submode = 6;
+
+        string update_summary = 200 [(ivp.field).level = DEVELOPER];
+        // set only when ACTIVE
+        optional double priority_weight = 201 [(ivp.field).level = DEVELOPER];
+        optional uint32 pieces = 202 [(ivp.field).level = DEVELOPER];
+        optional double create_cpu = 203 [(ivp.field).level = DEVELOPER];
+    }
+    repeated Behavior behavior = 103 [(ivp.field).level = ADVANCED];
+    optional double turn_rate = 104 [(ivp.field).level = ADVANCED];
+    repeated string contact = 105 [(ivp.field).level = ADVANCED];
+    uint32 warning_count = 106 [(ivp.field).level = ADVANCED];
+
+    uint32 iteration = 200 [(ivp.field).level = DEVELOPER];
+    uint32 behavior_count = 201 [(ivp.field).level = DEVELOPER];
+    uint32 behavior_count_ever = 202 [(ivp.field).level = DEVELOPER];
+    uint32 completed_count = 203 [(ivp.field).level = DEVELOPER];
+    bool completed_pending = 204 [(ivp.field).level = DEVELOPER];
+    uint32 objective_function_count = 205 [(ivp.field).level = DEVELOPER];
+    uint32 total_pieces_formed = 206 [(ivp.field).level = DEVELOPER];
+    uint32 total_pieces_cached = 207 [(ivp.field).level = DEVELOPER];
+    double create_cpu = 208 [(ivp.field).level = DEVELOPER];
+    double solve_cpu = 209 [(ivp.field).level = DEVELOPER];
+    double loop_cpu = 210 [(ivp.field).level = DEVELOPER];
+    double max_create_cpu = 211 [(ivp.field).level = DEVELOPER];
+    double max_solve_cpu = 212 [(ivp.field).level = DEVELOPER];
+    double max_loop_cpu = 213 [(ivp.field).level = DEVELOPER];
+    double cpu_load = 214 [(ivp.field).level = DEVELOPER];
+
+    message UpdateResult
+    {
+        string behavior = 1;
+        string variable = 2;
+        enum Result
+        {
+            RESULT_UNKNOWN = 0;
+            SUCCESS = 1;
+            DUPLICATE = 2;
+            NAME_MISMATCH = 3;
+            PARAM_ERROR = 4;
+        }
+        Result result = 3;
+    }
+    repeated UpdateResult update_result = 215 [(ivp.field).level = DEVELOPER];
+}
+
+message Configuration
+{
+    option (ivp.msg).level = ADVANCED;
+
+    // IVPHELM_DOMAIN, IVPHELM_MODESET, IVPHELM_STATEVARS, IVPHELM_UPDATEVARS,
+    // IVPHELM_REGISTER; published at startup and on change
+
+    int64 time = 1;
+    string alias = 2;
+
+    message Domain
+    {
+        string name = 1;
+        double low = 2;
+        double high = 3;
+        uint32 points = 4;
+        bool optional_decision = 5;
+    }
+    repeated Domain domain = 3;
+
+    string mode_set = 4;
+    repeated string state_variable = 200 [(ivp.field).level = DEVELOPER];
+
+    message UpdateVariable
+    {
+        string behavior = 1;
+        string variable = 2;
+    }
+    repeated UpdateVariable update_variable = 201 [(ivp.field).level = DEVELOPER];
+    repeated string subscription = 202 [(ivp.field).level = DEVELOPER];
 }
