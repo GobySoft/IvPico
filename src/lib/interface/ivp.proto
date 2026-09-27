@@ -3,8 +3,13 @@ syntax = "proto3";
 package ivp.interface;
 
 import "interface/options.proto";
+import "openocean/messages/control.proto";
+import "openocean/messages/navigation.proto";
 
 // All "time" fields are microseconds since the UNIX epoch.
+//
+// openocean messages are in SI units (angles in radians), so values are converted to and from
+// MOOS's degrees at the helm.
 
 // ---------------------------------------------------------------------------
 // Inputs
@@ -15,39 +20,20 @@ message Navigation
     // equivalent of NAV_X, NAV_Y, NAV_HEADING, etc. (self) and
     // NODE_REPORT / AIS_REPORT (other vehicles)
 
-    uint64 time = 1;
-
-    oneof source
-    {
-        bool self = 2;
-        string vehicle_name = 3;
-    }
-
-    // local grid (meters); derived from latitude/longitude if unset
-    optional double x = 4;
-    optional double y = 5;
-    optional double latitude = 6;
-    optional double longitude = 7;
-
-    optional double heading_true = 8;
-    optional double speed_over_water = 9;
-    optional double depth = 10;
-
-    optional double course_over_ground = 100 [(ivp.field).level = ADVANCED];
-    optional double speed_over_ground = 101 [(ivp.field).level = ADVANCED];
-    optional double altitude = 102 [(ivp.field).level = ADVANCED];
-    optional double pitch = 103 [(ivp.field).level = ADVANCED];
-    optional double roll = 104 [(ivp.field).level = ADVANCED];
+    // NAV_X, NAV_Y are nav.enu.e, nav.enu.n, derived from nav.geodetic if unset.
+    // Other vehicles are named by nav.vehicle.name.
+    openocean.Navigation nav = 1;
+    bool self = 2;
 
     // matched against behaviors' contact filters (match_type, ignore_group,
     // etc.)
-    string type = 105 [(ivp.field).level = ADVANCED];
-    string group = 106 [(ivp.field).level = ADVANCED];
-    string color = 107 [(ivp.field).level = ADVANCED];
-    optional double length = 108 [(ivp.field).level = ADVANCED];
-    optional double beam = 109 [(ivp.field).level = ADVANCED];
+    string type = 100 [(ivp.field).level = ADVANCED];
+    string group = 101 [(ivp.field).level = ADVANCED];
+    string color = 102 [(ivp.field).level = ADVANCED];
+    optional double length = 103 [(ivp.field).level = ADVANCED];
+    optional double beam = 104 [(ivp.field).level = ADVANCED];
     // origin of this report, e.g. "ais" or "radar"
-    string vsource = 110 [(ivp.field).level = ADVANCED];
+    string vsource = 105 [(ivp.field).level = ADVANCED];
 }
 
 message Variable
@@ -137,26 +123,8 @@ message Solution
 
     uint64 time = 1;
 
-    message Setpoints
-    {
-        // unset means no decision was made for that domain variable
-        optional double heading = 1;
-        optional double speed = 2;
-        optional double depth = 3;
-
-        optional double pitch = 100 [(ivp.field).level = ADVANCED];
-        optional double roll = 101 [(ivp.field).level = ADVANCED];
-        optional double altitude = 102 [(ivp.field).level = ADVANCED];
-
-        message CustomSetpoint
-        {
-            string domain = 1;
-            double value = 2;
-            string unit = 3;
-        }
-        repeated CustomSetpoint custom = 103 [(ivp.field).level = ADVANCED];
-    }
-    Setpoints desired = 2;
+    // an unset field means no decision was made for that domain variable
+    openocean.ControlSetpoint desired = 2;
 
     // anything but CLEAR means every desired value is zero
     AllStop allstop = 3;

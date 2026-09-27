@@ -15,3 +15,14 @@ One way to think of this project is as a generator for the equivalent of the MOO
   - bin: Binary source
     - goby: Goby middleware app
     - ros: ROS middleware node
+
+## Building
+
+*This section was written by Claude.*
+
+The interface messages use `Navigation` and `ControlSetpoint` from [openocean-messages](https://github.com/openocean-software/openocean-messages), found with `find_package(openocean_messages)`: install it, or point CMake at its build directory:
+
+```
+cmake -S . -B build -Dopenocean_messages_DIR=/path/to/openocean-messages/build
+cmake --build build
+```
