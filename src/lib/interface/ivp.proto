@@ -41,7 +41,7 @@ message Variable
     // equivalent of any MOOS variable read by behaviors or mode declarations
     // (conditions, "updates" variables, spawn requests, info variables)
 
-    uint64 time = 1;
+    int64 time = 1;
     string key = 2;
     oneof value
     {
@@ -52,7 +52,7 @@ message Variable
 
 message Command
 {
-    uint64 time = 1;
+    int64 time = 1;
 
     message Restart
     {
@@ -121,13 +121,12 @@ message Solution
 {
     // DESIRED_HEADING, DESIRED_SPEED, DESIRED_DEPTH, etc.
 
-    uint64 time = 1;
-
-    // an unset field means no decision was made for that domain variable
-    openocean.ControlSetpoint desired = 2;
+    // desired.time is the solution's time; an unset field means no decision
+    // was made for that domain variable
+    openocean.ControlSetpoint desired = 1;
 
     // anything but CLEAR means every desired value is zero
-    AllStop allstop = 3;
+    AllStop allstop = 2;
 
     uint32 iteration = 200 [(ivp.field).level = DEVELOPER];
 }
@@ -137,7 +136,7 @@ message Posting
     // equivalent of the MOOS variables the helm publishes on behalf of
     // behaviors and the mode set (flags, WPT_STAT, MODE, initialize, etc.)
 
-    uint64 time = 1;
+    int64 time = 1;
 
     enum Origin
     {
@@ -165,7 +164,7 @@ message BehaviorEvent
 {
     // equivalent of BHV_WARNING, BHV_ERROR, BHV_EVENT, BHV_STATUS, etc.
 
-    uint64 time = 1;
+    int64 time = 1;
     string behavior = 2;
 
     enum Kind
@@ -192,7 +191,7 @@ message ObjectiveFunction
 
     // equivalent of BHV_IPF
 
-    uint64 time = 1;
+    int64 time = 1;
     string behavior = 2;
     // FunctionEncoder string (IvPFunctionToString)
     string encoding = 3;
@@ -204,7 +203,7 @@ message OffboardMessage
 {
     // equivalent of NODE_MESSAGE_LOCAL
 
-    uint64 time = 1;
+    int64 time = 1;
     string source_node = 2;
     string destination_node = 3;
     string destination_group = 4;
@@ -226,7 +225,7 @@ message Visualization
 {
     // equivalent of VIEW_POINT, VIEW_SEGLIST, VIEW_POLYGON, VIEW_SEGLR
 
-    uint64 time = 1;
+    int64 time = 1;
     string behavior = 2;
     string label = 3;
     // false erases a previously drawn shape with the same label
@@ -279,7 +278,7 @@ message LifeEvent
 {
     // equivalent of IVPHELM_LIFE_EVENT
 
-    uint64 time = 1;
+    int64 time = 1;
 
     enum Type
     {
@@ -302,7 +301,7 @@ message Status
 {
     // IVPHELM_STATE, IVPHELM_ALLSTOP, IVPHELM_SUMMARY, IVPHELM_BHV_*, etc.
 
-    uint64 time = 1;
+    int64 time = 1;
 
     enum State
     {
@@ -344,7 +343,7 @@ message Status
             DISABLED = 100 [(ivp.ev).level = ADVANCED];
         }
         RunState run_state = 3;
-        uint64 state_time_entered = 4;
+        int64 state_time_entered = 4;
         string mode = 5;
         string submode = 6;
 
@@ -399,7 +398,7 @@ message Configuration
     // IVPHELM_DOMAIN, IVPHELM_MODESET, IVPHELM_STATEVARS, IVPHELM_UPDATEVARS,
     // IVPHELM_REGISTER; published at startup and on change
 
-    uint64 time = 1;
+    int64 time = 1;
     string alias = 2;
 
     message Domain
