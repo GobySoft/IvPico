@@ -45,6 +45,7 @@ fi
 echo "deb [signed-by=${keyring}] http://packages.gobysoft.org/${ID}/release/ ${VERSION_CODENAME}/" |
     $SUDO tee /etc/apt/sources.list.d/gobysoft_release.list > /dev/null
 $SUDO apt-get update
-apt_install libgoby3-dev goby3-apps
+# goby's CMake package links libais.so, which libgoby3-dev only recommends
+apt_install libgoby3-dev goby3-apps libais-dev
 
 external/openocean-messages/init.sh --cxx
