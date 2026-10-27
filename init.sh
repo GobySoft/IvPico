@@ -30,7 +30,8 @@ apt_install() {
 }
 
 # moos-ivp's helm libraries (IVP_BUILD_HELM_LIBS_ONLY) need only CMake and a compiler
-packages=(cmake ninja-build g++ git ca-certificates protobuf-compiler libprotobuf-dev curl gpg)
+# xz-utils: the replay tests' recorded missions are compressed
+packages=(cmake ninja-build g++ git ca-certificates protobuf-compiler libprotobuf-dev curl gpg xz-utils)
 $SUDO apt-get update
 apt_install "${packages[@]}"
 

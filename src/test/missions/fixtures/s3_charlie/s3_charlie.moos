@@ -1,0 +1,275 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% LOG FILE:       ./MOOSLog_27_10_2026_____07_42_08/MOOSLog_27_10_2026_____07_42_08._moos
+%% FILE OPENED ON  Thu Jan  1 00:00:00 1970
+%% LOGSTART           17930869283.83171
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//-------------------------------------------------
+// NAME: M. Benjamin, MIT CSAIL
+// FILE: charlie.moos
+//-------------------------------------------------
+
+ServerHost   = localhost
+ServerPort   = 9000
+Community    = charlie
+
+//----  Next Line was commented and replaced with a command line overload ---- //
+//MOOSTimeWarp = 1    (default)
+MOOSTimeWarp = 10
+LatOrigin    = 43.825300 
+LongOrigin   = -70.330400 
+
+//------------------------------------------
+// Antler configuration  block
+ProcessConfig = ANTLER
+{
+  Run = uTimerScript @ NewConsole = false ~ uTimerScript_record
+  MSBetweenLaunches = 200
+
+  Run = MOOSDB          @ NewConsole = false
+  Run = pLogger @ NewConsole = false
+  Run = uSimMarine      @ NewConsole = false
+  Run = pNodeReporter   @ NewConsole = false
+  Run = pMarinePID      @ NewConsole = false
+  Run = pMarineViewer   @ NewConsole = false
+  Run = pHelmIvP        @ NewConsole = false
+  Run = uTimerScript    @ NewConsole = false
+}
+
+//------------------------------------------
+// pLogger config block
+
+ProcessConfig = pLogger
+{
+  Log = APPCAST @ 0 NOSYNC
+  Log = BHV_IPF @ 0 NOSYNC
+  Log = BHV_SETTINGS @ 0 NOSYNC
+  Log = BHV_STATUS @ 0 NOSYNC
+  Log = BHV_WARNING @ 0 NOSYNC
+  Log = DEPLOY @ 0 NOSYNC
+  Log = DESIRED_HEADING @ 0 NOSYNC
+  Log = DESIRED_SPEED @ 0 NOSYNC
+  Log = IVPHELM_ALLSTOP @ 0 NOSYNC
+  Log = IVPHELM_BHV_ACTIVE @ 0 NOSYNC
+  Log = IVPHELM_BHV_ACTIVE_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_CNT_EVER @ 0 NOSYNC
+  Log = IVPHELM_BHV_DISABLED_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_IDLE @ 0 NOSYNC
+  Log = IVPHELM_BHV_IDLE_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_RUNNING_CNT @ 0 NOSYNC
+  Log = IVPHELM_COMPLETED_PENDING @ 0 NOSYNC
+  Log = IVPHELM_CPU @ 0 NOSYNC
+  Log = IVPHELM_CREATE_CPU @ 0 NOSYNC
+  Log = IVPHELM_DOMAIN @ 0 NOSYNC
+  Log = IVPHELM_IPF_CNT @ 0 NOSYNC
+  Log = IVPHELM_ITER @ 0 NOSYNC
+  Log = IVPHELM_LEDGER_SUMMARY @ 0 NOSYNC
+  Log = IVPHELM_LIFE_EVENT @ 0 NOSYNC
+  Log = IVPHELM_LOOP_CPU @ 0 NOSYNC
+  Log = IVPHELM_MODESET @ 0 NOSYNC
+  Log = IVPHELM_REGISTER @ 0 NOSYNC
+  Log = IVPHELM_STATE @ 0 NOSYNC
+  Log = IVPHELM_STATEVARS @ 0 NOSYNC
+  Log = IVPHELM_SUMMARY @ 0 NOSYNC
+  Log = IVPHELM_TOTAL_PCS_CACHED @ 0 NOSYNC
+  Log = IVPHELM_TOTAL_PCS_FORMED @ 0 NOSYNC
+  Log = IVPHELM_UPDATEVARS @ 0 NOSYNC
+  Log = LOITER @ 0 NOSYNC
+  Log = LOITER_ACQUIRE @ 0 NOSYNC
+  Log = LOITER_DIST_TO_POLY @ 0 NOSYNC
+  Log = LOITER_DIST_TO_VERT @ 0 NOSYNC
+  Log = LOITER_ETA_TO_POLY @ 0 NOSYNC
+  Log = LOITER_INDEX @ 0 NOSYNC
+  Log = LOITER_MODE @ 0 NOSYNC
+  Log = LOITER_REPORT @ 0 NOSYNC
+  Log = MODE @ 0 NOSYNC
+  Log = MOOS_DEBUG @ 0 NOSYNC
+  Log = NAV_HEADING @ 0 NOSYNC
+  Log = NAV_SPEED @ 0 NOSYNC
+  Log = NAV_X @ 0 NOSYNC
+  Log = NAV_Y @ 0 NOSYNC
+  Log = PHELMIVP_PID @ 0 NOSYNC
+  Log = PHELMIVP_STATUS @ 0 NOSYNC
+  Log = PLOGGER_CMD @ 0 NOSYNC
+  Log = RETURN @ 0 NOSYNC
+  Log = RETURN_UPDATES @ 0 NOSYNC
+  Log = STATION_KEEP @ 0 NOSYNC
+  Log = TURN_RATE @ 0 NOSYNC
+  Log = UP_LOITER @ 0 NOSYNC
+  Log = VIEW_POINT @ 0 NOSYNC
+  Log = VIEW_POLYGON @ 0 NOSYNC
+  AppTick    = 4
+  CommsTick  = 4
+
+  LogAuxSrc = true
+  WildCardLogging = true
+}
+
+//------------------------------------------
+// uSimMarine config block
+
+ProcessConfig = uSimMarine
+{
+  AppTick	  = 10
+  CommsTick	= 10
+
+  start_x       = 0
+  start_y       = -10
+  start_speed   = 0
+  start_heading = 180
+  prefix        = NAV
+  max_deceleration  = 0.1
+
+  dual_state    = true
+}
+
+//------------------------------------------
+// pHelmIvP config block
+
+ProcessConfig = pHelmIvP
+{
+  AppTick    = 4
+  CommsTick  = 4
+
+  behaviors  = charlie.bhv
+  verbose    = true
+  domain     = course:0:359:360
+  domain     = speed:0:4:21
+}
+
+//------------------------------------------
+// pNodeReporter config block
+
+ProcessConfig = pNodeReporter
+{
+  AppTick	= 2
+  CommsTick	= 2
+
+  platform_type   = kayak
+  platform_length = 3
+  platform_group  = normal
+
+  alt_nav_prefix = NAV_GT
+	alt_nav_group  = gnd_truth
+
+	}
+//------------------------------------------
+// pMarinePID config block
+
+ProcessConfig = pMarinePID
+{
+  AppTick    = 20
+  CommsTick  = 20
+
+  verbose       = true
+  depth_control = false
+
+  // Yaw PID controller
+  yaw_pid_kp		 = 0.5
+  yaw_pid_kd		 = 0.0
+  yaw_pid_ki		 = 0.0
+  yaw_pid_integral_limit = 0.07
+
+  // Speed PID controller
+  speed_pid_kp		 = 1.0
+  speed_pid_kd		 = 0.0
+  speed_pid_ki		 = 0.0
+  speed_pid_integral_limit = 0.07
+
+  //MAXIMUMS
+  maxrudder    = 100
+  maxthrust    = 100
+
+  // Non-zero SPEED_FACTOR overrides SPEED_PID
+  // DESIRED_THRUST = DESIRED_SPEED * SPEED_FACTOR
+  speed_factor = 20
+}
+
+//------------------------------------------
+// uTimerScript configuration  block
+
+ProcessConfig = uTimerScript
+{
+  AppTick   = 2
+  CommsTick = 2
+
+  paused      = false
+  reset_max   = unlimited
+  reset_time  = end
+  condition   = WIND_GUSTS = true
+  delay_start = 30
+  delay_reset = 10:60
+  time_warp   = 0.25:2.0
+
+  randvar = varname=ANG, min=0,   max=359, key=at_reset
+  randvar = varname=MAG, min=1.5, max=3.5, key=at_reset
+
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*0.2}", time=0
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*0.2}", time=2
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*0.2}", time=4
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*0.2}", time=6
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*0.2}", time=8
+
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*-0.2}", time=10
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*-0.2}", time=12
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*-0.2}", time=14
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*-0.2}", time=16
+  event = var=DRIFT_VECTOR_ADD, val="$(ANG),{$(MAG)*-0.2}", Time=18
+}
+
+//------------------------------------------
+// pMarineViewer config block
+
+ProcessConfig = pMarineViewer
+{
+  AppTick    = 4
+  CommsTick  = 4
+
+  appcast_viewable = true
+
+  tiff_file            = forrest19.tif
+  set_pan_x            = -90
+  set_pan_y            = -340
+  zoom                 = 0.65
+  vehicle_shape_scale  = 2.0
+  hash_delta           = 50
+  hash_shade           = 0.4
+  hash_viewable        = true
+
+  scope    = LOITER_REPORT
+  scope    = LOITER_DIST_TO_POLY
+  scope    = USM_FSUMMARY
+  scope    = USM_DRIFT_VECTOR_ADD
+  scope    = DB_CLIENTS
+  scope    = CONVEX_GRID_CONFIG
+
+  action   = UP_LOITER = center_assign = 40,-40
+  action+  = UP_LOITER = center_assign = x=100, y=-80
+
+  action   = UP_LOITER = polygon = format=radial, x=0, y=-75, radius=40, pts=6
+  action+  = UP_LOITER = polygon = format=ellipse, x=110, y=-75, degs=150, pts=14, major=80, minor=20
+
+  action   = UP_LOITER = center_activate = true
+  action+  = UP_LOITER = center_activate = false
+
+  action   = WIND_GUSTS = true
+  action+  = WIND_GUSTS = false
+
+  action = UP_LOITER=clockwise=true
+  action = UP_LOITER=clockwise=false
+
+  button_one   = DEPLOY # MOOS_MANUAL_OVERRIDE=false # DEPLOY=true
+  button_two   = STATION_KEEP=false # LOITER=true # RETURN=false
+  button_two   = RETURN # RETURN=true # STATION_KEEP=false
+  button_three = SKEEP:true  # STATION_KEEP=true
+  button_four  = SKEEP:false # STATION_KEEP=false
+}
+
+ProcessConfig = uTimerScript_record
+{
+  condition = (IVPHELM_STATE = PARK) or (IVPHELM_STATE = DRIVE)
+  event = var=DEPLOY, val=true, time=5
+  event = var=MOOS_MANUAL_OVERRIDE, val=false, time=5
+}
+
+
