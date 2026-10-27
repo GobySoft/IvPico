@@ -96,8 +96,9 @@ run() {
         cd "${run}"
         prepare "${moos_file}" "${pokes[@]}"
         [ -n "${variables}" ] && add_logging "${moos_file}" "${variables}"
-        # its own process group, to stop whatever pAntler leaves behind
-        setsid pAntler "${moos_file}" --MOOSTimeWarp="${warp}" > antler.log 2>&1 &
+        # job control puts pAntler in its own process group, to stop whatever it leaves behind
+        set -m
+        pAntler "${moos_file}" --MOOSTimeWarp="${warp}" > antler.log 2>&1 &
         antler=$!
         sleep $((seconds / warp))
         kill -INT "${antler}"
