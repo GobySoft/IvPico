@@ -111,10 +111,9 @@ record() {
 
     run "${work}/runs/${mission}.discover" "${moos_file}" "${warp}" "${seconds}"
     local variables
-    local discover_logs
-    discover_logs=$(log_dirs "${work}/runs/${mission}.discover")
-    # shellcheck disable=SC2086
-    variables=$(helm_variables $(printf '%s/*.alog %s/*.xlog ' ${discover_logs}) | tr '\n' ' ')
+    local logs=()
+    mapfile -t logs < <(find "${work}/runs/${mission}.discover" -name '*.alog' -o -name '*.xlog')
+    variables=$(helm_variables "${logs[@]}" | tr '\n' ' ')
     run "${work}/runs/${mission}" "${moos_file}" "${warp}" "${seconds}" "${variables}"
 
     local fixture=${here}/fixtures/${mission}
