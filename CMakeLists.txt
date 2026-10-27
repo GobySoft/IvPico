@@ -9,8 +9,15 @@ endif()
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
 # MOOS-IvP's helm libraries (IVP_BUILD_HELM_LIBS_ONLY)
 find_package(IVP CONFIG REQUIRED)
+
+find_package(GOBY 3.0 COMPONENTS zeromq)
+if(NOT GOBY_FOUND)
+  message(STATUS "Goby3 not found: not building the Goby app")
+endif()
 
 include(CTest)
 

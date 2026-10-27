@@ -25,9 +25,25 @@ if [ "$(id -u)" -ne 0 ]; then
     SUDO=sudo
 fi
 
+apt_install() {
+    $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@"
+}
+
 # moos-ivp's helm libraries (IVP_BUILD_HELM_LIBS_ONLY) need only CMake and a compiler
-packages=(cmake ninja-build g++ git ca-certificates protobuf-compiler libprotobuf-dev)
+packages=(cmake ninja-build g++ git ca-certificates protobuf-compiler libprotobuf-dev curl gpg)
 $SUDO apt-get update
-$SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
+apt_install "${packages[@]}"
+
+# Goby3, for src/bin/goby, from packages.gobysoft.org
+keyring=/usr/share/keyrings/gobysoft-archive-keyring.gpg
+if [ ! -f "${keyring}" ]; then
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x19478082E2F8D3FE" |
+        gpg --dearmor | $SUDO tee "${keyring}" > /dev/null
+fi
+. /etc/os-release
+echo "deb [signed-by=${keyring}] http://packages.gobysoft.org/${ID}/release/ ${VERSION_CODENAME}/" |
+    $SUDO tee /etc/apt/sources.list.d/gobysoft_release.list > /dev/null
+$SUDO apt-get update
+apt_install libgoby3-dev goby3-apps
 
 external/openocean-messages/init.sh --cxx
