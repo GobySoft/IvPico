@@ -42,7 +42,8 @@ prepare() {
          antler && /^[ \t]*Run *= *pLogger[ \t@]/ { next }
          { print }
          antler && /^[ \t]*{/ { print "  Run = uTimerScript @ NewConsole = false ~ uTimerScript_record" }
-         antler && /^[ \t]*Run *= *MOOSDB[ \t@]/ { print "  Run = pLogger @ NewConsole = false"; antler = 0 }' \
+         antler && /^[ \t]*Run *= *MOOSDB[ \t@]/ { print "  Run = pLogger @ NewConsole = false" }
+         antler && /^[ \t]*}/ { antler = 0 }' \
         "${moos_file}" > "${moos_file}.prepared"
     {
         echo "ProcessConfig = uTimerScript_record"
@@ -129,6 +130,7 @@ record() {
             echo "warning: ${mission}'s log misses pHelmIvP's startup" >&2
         fi
         for bhv in "${log}"/*._bhv; do
+            [ -e "${bhv}" ] || continue
             cp "${bhv}" "${fixture}/$(basename "${bhv}" ._bhv).bhv"
         done
     done
