@@ -32,11 +32,11 @@ cmake -S . -B build -Dopenocean_messages_DIR=$PWD/external/openocean-messages/bu
 cmake --build build
 ```
 
-MOOS-IvP isn't built by IvPico yet. To build its libraries and non-GUI apps (MOOSGeodesy downloads PROJ while building):
+MOOS-IvP isn't built by IvPico yet. To build its libraries and non-GUI apps (`build-moos.sh` calls skipping its GUI tools `--minrobot`, and MOOSGeodesy downloads PROJ while building):
 
 ```
 cd external/moos-ivp
-./build-moos.sh
+./build-moos.sh --minrobot
 ./build-ivp.sh --nogui
 ```
 

@@ -25,7 +25,7 @@ if [ "$(id -u)" -ne 0 ]; then
     SUDO=sudo
 fi
 
-# moos-ivp's libraries and non-GUI apps (build-ivp.sh --nogui), so not FLTK and the X libraries
+# moos-ivp without its GUI tools (build-moos.sh --minrobot, build-ivp.sh --nogui), so not FLTK or X
 packages=(cmake make g++ git ca-certificates protobuf-compiler libprotobuf-dev)
 $SUDO apt-get update
 $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
