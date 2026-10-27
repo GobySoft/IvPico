@@ -31,8 +31,8 @@ trim() {
          ($3 ~ /^pHelmIvP/ || ($2 in registered)) && !seen[$0]++' "$1" "$1"
 }
 
-# Launches pLogger right after MOOSDB, so it logs pHelmIvP from the start, and
-# adds a uTimerScript that pokes once pHelmIvP is up. uTimerScript's posts are
+# Launches pLogger right after MOOSDB, so it logs pHelmIvP from the start,
+# without omitting anything (e.g. BHV_STATUS), and adds a uTimerScript that pokes once pHelmIvP is up. uTimerScript's posts are
 # timestamped and delivered like the other apps', where uPokeDB's reach
 # pHelmIvP seconds after their timestamps under time warp.
 prepare() {
@@ -40,6 +40,7 @@ prepare() {
     shift
     awk 'tolower($0) ~ /processconfig *= *antler/ { antler = 1 }
          antler && /^[ \t]*Run *= *pLogger[ \t@]/ { next }
+         tolower($0) ~ /^[ \t]*wildcardomitpattern/ { next }
          { print }
          antler && /^[ \t]*{/ { print "  Run = uTimerScript @ NewConsole = false ~ uTimerScript_record" }
          antler && /^[ \t]*Run *= *MOOSDB[ \t@]/ { print "  Run = pLogger @ NewConsole = false" }
@@ -95,10 +96,16 @@ run() {
         cd "${run}"
         prepare "${moos_file}" "${pokes[@]}"
         [ -n "${variables}" ] && add_logging "${moos_file}" "${variables}"
-        pAntler "${moos_file}" --MOOSTimeWarp="${warp}" > antler.log 2>&1 &
+        # its own process group, to stop whatever pAntler leaves behind
+        setsid pAntler "${moos_file}" --MOOSTimeWarp="${warp}" > antler.log 2>&1 &
         antler=$!
         sleep $((seconds / warp))
         kill -INT "${antler}"
+        for _ in $(seq 20); do
+            kill -0 "${antler}" 2> /dev/null || break
+            sleep 1
+        done
+        kill -KILL -- "-${antler}" 2> /dev/null || true
         wait "${antler}" || true
     )
 }
@@ -126,7 +133,7 @@ record() {
         name=$(basename "${log}")
         trim "${log}/${name}.alog" | xz -9 > "${fixture}/${mission}.alog.xz"
         cp "${log}/${name}._moos" "${fixture}/${mission}.moos"
-        if ! xz -dc "${fixture}/${mission}.alog.xz" | grep -q "HELM_VAR_INIT\|IVPHELM_REGISTER"; then
+        if ! xz -dc "${fixture}/${mission}.alog.xz" | grep "IVPHELM_REGISTER" > /dev/null; then
             echo "warning: ${mission}'s log misses pHelmIvP's startup" >&2
         fi
         for bhv in "${log}"/*._bhv; do
