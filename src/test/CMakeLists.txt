@@ -17,6 +17,17 @@ foreach(fixture ${fixtures})
 endforeach()
 
 if(GOBY_FOUND)
+  add_subdirectory(goby)
+
+  set(simulator_port 54400)
+  foreach(mission s1_alpha s2_bravo s3_charlie s4_delta)
+    add_test(NAME closed_loop_${mission}
+      COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/missions/goby/run.sh ${mission}
+              $<TARGET_FILE:goby_helm_ivp> $<TARGET_FILE:ivpico_mission_check> ${simulator_port})
+    set_tests_properties(closed_loop_${mission} PROPERTIES TIMEOUT 180)
+    math(EXPR simulator_port "${simulator_port} + 1")
+  endforeach()
+
   add_test(NAME goby_helm_ivp
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/goby/test_goby_helm_ivp.sh
             $<TARGET_FILE:goby_helm_ivp> $<TARGET_FILE:ivpico_interface>)

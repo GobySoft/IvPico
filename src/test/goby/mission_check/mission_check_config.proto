@@ -1,0 +1,35 @@
+syntax = "proto2";
+
+import "goby/middleware/protobuf/app_config.proto";
+import "goby/zeromq/protobuf/interprocess_config.proto";
+
+package ivpico.goby.protobuf;
+
+message MissionCheckConfig
+{
+    optional .goby.middleware.protobuf.AppConfig app = 1;
+    optional .goby.zeromq.protobuf.InterProcessPortalConfig interprocess = 2;
+
+    // mission seconds to run, from when the helm is first in PARK or DRIVE
+    required double duration = 10;
+
+    // published as a Variable at this many mission seconds
+    message Poke
+    {
+        required double at = 1;
+        required string key = 2;
+        required string value = 3;
+    }
+    repeated Poke poke = 11;
+
+    // a Posting (by a behavior, a mode, initialize, ...) of key = value
+    message ExpectPosting
+    {
+        required string key = 1;
+        required string value = 2;
+        required double before = 3;
+    }
+    repeated ExpectPosting expect_posting = 12;
+
+    optional bool drive_at_end = 13 [default = false];
+}
