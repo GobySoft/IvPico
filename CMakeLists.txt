@@ -11,6 +11,9 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
+find_package(Protobuf REQUIRED)
+find_package(openocean_messages 0.1 REQUIRED COMPONENTS cpp)
+
 # MOOS-IvP's helm libraries (IVP_BUILD_HELM_LIBS_ONLY)
 find_package(IVP CONFIG REQUIRED)
 

@@ -15,3 +15,9 @@ foreach(fixture ${fixtures})
     add_test(NAME replay_${mission} COMMAND replay ${fixture})
   endif()
 endforeach()
+
+if(GOBY_FOUND)
+  add_test(NAME goby_helm_ivp
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/goby/test_goby_helm_ivp.sh
+            $<TARGET_FILE:goby_helm_ivp> $<TARGET_FILE:ivpico_interface>)
+endif()

@@ -1,6 +1,3 @@
-find_package(Protobuf REQUIRED)
-find_package(openocean_messages 0.1 REQUIRED COMPONENTS cpp)
-
 add_library(ivpico_interface)
 protobuf_generate(
   TARGET ivpico_interface
