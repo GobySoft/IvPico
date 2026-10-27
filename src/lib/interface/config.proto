@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package ivp.interface;
+
+import "interface/options.proto";
+import "openocean/messages/common.proto";
+
+// The equivalent of pHelmIvP's configuration block. Unset optional fields
+// take pHelmIvP's defaults.
+message HelmConfig
+{
+    // .bhv files ("behaviors"), read in sorted order
+    repeated string behavior_file = 1;
+
+    message Domain
+    {
+        string name = 1;
+        double low = 2;
+        double high = 3;
+        oneof resolution
+        {
+            uint32 points = 4;
+            double delta = 5;
+        }
+        // a decision isn't required for this variable
+        bool optional = 6 [(ivp.field).level = ADVANCED];
+    }
+    repeated Domain domain = 2;
+
+    // what behaviors know as "us" (pHelmIvP uses the MOOS community)
+    string ownship = 3;
+
+    bool start_in_drive = 4;
+    // default true
+    optional bool allow_park = 5;
+    // default true
+    optional bool park_on_allstop = 6;
+    // seconds before warning that NAV_X, NAV_Y, etc. are still missing; default 5
+    optional double nav_grace = 7;
+
+    bool goals_mandatory = 100 [(ivp.field).level = ADVANCED];
+    string helm_alias = 101 [(ivp.field).level = ADVANCED];
+    // default true
+    optional bool seed_random = 102 [(ivp.field).level = ADVANCED];
+    // seconds, 10 to 1800; default 45
+    optional double contact_max_age = 103 [(ivp.field).level = ADVANCED];
+    // default 500
+    optional uint32 contact_max_count = 104 [(ivp.field).level = ADVANCED];
+
+    message PlatformModel
+    {
+        enum Algorithm
+        {
+            HOLONOMIC = 0;
+            DUBINS = 1;
+        }
+        Algorithm algorithm = 1;
+        optional double radius = 2;
+        optional double spoke_degs = 3;
+    }
+    PlatformModel platform_model = 105 [(ivp.field).level = ADVANCED];
+
+    // directories of libBHV_*.so behaviors
+    repeated string behavior_dir = 106 [(ivp.field).level = ADVANCED];
+    bool behavior_dir_not_found_ok = 107 [(ivp.field).level = ADVANCED];
+
+    // seconds an input may lag the helm's clock before it's ignored; negative
+    // accepts any; default 60
+    optional double ok_skew = 108 [(ivp.field).level = ADVANCED];
+    // seconds to wait for a value from elsewhere before posting an
+    // "initialize_" (deferred) variable; default 1
+    optional double defer_window = 109 [(ivp.field).level = ADVANCED];
+    // which Navigation.speed entry becomes NAV_SPEED, if there's one
+    // with this mode
+    openocean.SpeedMode speed_mode = 110 [(ivp.field).level = ADVANCED];
+
+    bool report_objective_functions = 200 [(ivp.field).level = DEVELOPER];
+    // default true; false leaves alerts to an outside contact manager
+    optional bool contact_alerts = 201 [(ivp.field).level = DEVELOPER];
+}
