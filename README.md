@@ -23,7 +23,7 @@ One way to think of this project is as a generator for the equivalent of the MOO
 
 *This section was written by Claude.*
 
-`init.sh` checks out the submodules and installs the Ubuntu packages needed to build them and IvPico. `build.sh` then builds, all in `build/`:
+`init.sh` checks out the submodules and installs the Ubuntu packages needed to build them and IvPico. These include Goby3 from [packages.gobysoft.org](http://packages.gobysoft.org), for the Goby app; without Goby3, `build.sh` skips the Goby app. `build.sh` then builds, all in `build/`:
 
 - openocean-messages, into `build/external/openocean-messages`;
 - MOOS-IvP's helm libraries (`IVP_BUILD_HELM_LIBS_ONLY`, as shared libraries, without MOOS or its apps), into `build/external/moos-ivp`, installed into `build/external/install` for `find_package(IVP)`;
