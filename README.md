@@ -15,14 +15,26 @@ One way to think of this project is as a generator for the equivalent of the MOO
   - bin: Binary source
     - goby: Goby middleware app
     - ros: ROS middleware node
+- external: Submodules
+  - openocean-messages: [openocean-messages](https://github.com/openocean-software/openocean-messages), for the `Navigation` and `ControlSetpoint` messages
+  - moos-ivp: [MOOS-IvP](https://github.com/GobySoft/moos-ivp), for the IvP solver and behaviors
 
 ## Building
 
 *This section was written by Claude.*
 
-The interface messages use `Navigation` and `ControlSetpoint` from [openocean-messages](https://github.com/openocean-software/openocean-messages), found with `find_package(openocean_messages)`: install it, or point CMake at its build directory:
+`init.sh` checks out the submodules and installs the Ubuntu packages needed to build them and IvPico. `build.sh` then builds, all in `build/`:
+
+- openocean-messages, into `build/external/openocean-messages`;
+- MOOS-IvP's helm libraries (`IVP_BUILD_HELM_LIBS_ONLY`, as shared libraries, without MOOS or its apps), into `build/external/moos-ivp`, installed into `build/external/install` for `find_package(IVP)`;
+- IvPico, against both.
 
 ```
-cmake -S . -B build -Dopenocean_messages_DIR=/path/to/openocean-messages/build
-cmake --build build
+./init.sh
+./build.sh
+ctest --test-dir build
 ```
+
+`build.sh` passes any arguments on to IvPico's CMake, and `BUILD_DIR` overrides the build directory.
+
+To update a submodule, check out the commit you want in it and commit the new pointer, e.g. `git -C external/openocean-messages pull origin main && git add external/openocean-messages`.
