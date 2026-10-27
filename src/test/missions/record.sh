@@ -31,26 +31,35 @@ trim() {
          ($3 ~ /^pHelmIvP/ || ($2 in registered)) && !seen[$0]++' "$1" "$1"
 }
 
-# Adds a uTimerScript that makes the pokes from inside the community: its posts
-# are timestamped and delivered like the other apps', where uPokeDB's reach
+# Launches pLogger right after MOOSDB, so it logs pHelmIvP from the start, and
+# adds a uTimerScript that pokes once pHelmIvP is up. uTimerScript's posts are
+# timestamped and delivered like the other apps', where uPokeDB's reach
 # pHelmIvP seconds after their timestamps under time warp.
-add_pokes() {
+prepare() {
     local moos_file=$1
     shift
     awk 'tolower($0) ~ /processconfig *= *antler/ { antler = 1 }
+         antler && /^[ \t]*Run *= *pLogger[ \t@]/ { next }
          { print }
-         antler && /^[ \t]*{/ { print "  Run = uTimerScript @ NewConsole = false ~ uTimerScript_record"; antler = 0 }' \
-        "${moos_file}" > "${moos_file}.poked"
+         antler && /^[ \t]*{/ { print "  Run = uTimerScript @ NewConsole = false ~ uTimerScript_record" }
+         antler && /^[ \t]*Run *= *MOOSDB[ \t@]/ { print "  Run = pLogger @ NewConsole = false"; antler = 0 }' \
+        "${moos_file}" > "${moos_file}.prepared"
     {
         echo "ProcessConfig = uTimerScript_record"
         echo "{"
+        echo "  condition = (IVPHELM_STATE = PARK) or (IVPHELM_STATE = DRIVE)"
         local poke
         for poke in "$@"; do
-            echo "  event = var=${poke%%=*}, val=${poke#*=}, time=10"
+            echo "  event = var=${poke%%=*}, val=${poke#*=}, time=5"
         done
         echo "}"
-    } >> "${moos_file}.poked"
-    mv "${moos_file}.poked" "${moos_file}"
+    } >> "${moos_file}.prepared"
+    mv "${moos_file}.prepared" "${moos_file}"
+}
+
+# The log directories of a run, wherever its pLogger writes them
+log_dirs() {
+    find "$1" -name '*.alog' -exec dirname {} \; | sort -u
 }
 
 # pHelmIvP's posts and the variables it registered, from a first run's logs
@@ -83,7 +92,7 @@ run() {
     cp -r "${moos_ivp}/ivp/missions/${mission}" "${run}"
     (
         cd "${run}"
-        add_pokes "${moos_file}" "${pokes[@]}"
+        prepare "${moos_file}" "${pokes[@]}"
         [ -n "${variables}" ] && add_logging "${moos_file}" "${variables}"
         pAntler "${moos_file}" --MOOSTimeWarp="${warp}" > antler.log 2>&1 &
         antler=$!
@@ -102,18 +111,24 @@ record() {
 
     run "${work}/runs/${mission}.discover" "${moos_file}" "${warp}" "${seconds}"
     local variables
-    variables=$(helm_variables "${work}/runs/${mission}.discover"/MOOSLog_*/*.[ax]log | tr '\n' ' ')
+    local discover_logs
+    discover_logs=$(log_dirs "${work}/runs/${mission}.discover")
+    # shellcheck disable=SC2086
+    variables=$(helm_variables $(printf '%s/*.alog %s/*.xlog ' ${discover_logs}) | tr '\n' ' ')
     run "${work}/runs/${mission}" "${moos_file}" "${warp}" "${seconds}" "${variables}"
 
     local fixture=${here}/fixtures/${mission}
     rm -rf "${fixture}"
     mkdir -p "${fixture}"
     local log
-    for log in "${work}/runs/${mission}"/MOOSLog_*/; do
+    for log in $(log_dirs "${work}/runs/${mission}"); do
         local name
         name=$(basename "${log}")
         trim "${log}/${name}.alog" | xz -9 > "${fixture}/${mission}.alog.xz"
         cp "${log}/${name}._moos" "${fixture}/${mission}.moos"
+        if ! xz -dc "${fixture}/${mission}.alog.xz" | grep -q "HELM_VAR_INIT\|IVPHELM_REGISTER"; then
+            echo "warning: ${mission}'s log misses pHelmIvP's startup" >&2
+        fi
         for bhv in "${log}"/*._bhv; do
             cp "${bhv}" "${fixture}/$(basename "${bhv}" ._bhv).bhv"
         done

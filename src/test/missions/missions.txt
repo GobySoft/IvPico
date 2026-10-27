@@ -1,6 +1,6 @@
 # Single-vehicle MOOS-IvP missions recorded for the replay tests (record.sh).
 # Each runs from ivp/missions/<mission> with pAntler, and the pokes go in
-# 10 s (mission time) after launch.
+# 5 s (mission time) after pHelmIvP starts.
 #
 # mission     moos_file     warp  seconds  pokes
 s1_alpha      alpha.moos    10    600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false

@@ -447,7 +447,7 @@ int main(int argc, char* argv[])
         std::cerr << "usage: replay <fixture directory>\n";
         return 2;
     }
-    const fs::path dir = argv[1];
+    const fs::path dir = fs::path(argv[1]).lexically_normal();
     fs::path moos_file, alog_file;
     for (const auto& f : fs::directory_iterator(dir))
     {
@@ -457,7 +457,8 @@ int main(int argc, char* argv[])
                  f.path().string().substr(f.path().string().size() - 8) == ".alog.xz")
             alog_file = f.path();
     }
-    std::cout << "Replaying " << dir.filename().string() << "\n";
+    std::cout << "Replaying " << (dir.has_filename() ? dir : dir.parent_path()).filename().string()
+              << "\n";
 
     const HelmConfig cfg = read_config(moos_file, dir);
     const Alog alog = read_alog(alog_file);

@@ -139,6 +139,7 @@ class Helm::Impl
     void start(double time);
 
     // mail
+    void apply_pending(double time);
     void apply(const Navigation& nav, double time);
     void apply(const Command& command, double time);
     void apply_variable(const std::string& var, const Value& value, double msg_time);
@@ -347,31 +348,23 @@ const Output& Helm::Impl::iterate(double time)
     const double echo_time = posted_time_ == 0 ? time : posted_time_;
     posted_time_ = time;
 
-    if (!started_)
-        start(time);
-
     info_buffer_.setCurrTime(time);
     ledger_.setCurrTimeUTC(time);
+    if (!started_)
+    {
+        // pHelmIvP posts its "initialize" variables before it registers for
+        // anything, so they replace whatever was posted before it started
+        if (config_warnings_.empty())
+            apply_pending(time);
+        start(time);
+    }
+
     if (status_ != Status::MALCONFIG)
     {
         for (const auto& [var, value] : echo)
             if (registered_.count(var))
                 apply_variable(var, value, echo_time);
-        for (const auto& input : pending_)
-        {
-            if (const auto* nav = std::get_if<Navigation>(&input))
-                apply(*nav, time);
-            else if (const auto* var = std::get_if<Variable>(&input))
-            {
-                Value value;
-                value.is_string = var->value_case() == Variable::kSval;
-                value.d = var->dval();
-                value.s = var->sval();
-                apply_variable(var->key(), value, seconds(var->time(), time));
-            }
-            else
-                apply(std::get<Command>(input), time);
-        }
+        apply_pending(time);
         info_buffer_.setValue("COMMS_POLICY", comms_policy_, time);
     }
     pending_.clear();
@@ -432,6 +425,26 @@ const Output& Helm::Impl::iterate(double time)
     fill_status();
     info_buffer_.clearDeltaVectors();
     return output_;
+}
+
+void Helm::Impl::apply_pending(double time)
+{
+    for (const auto& input : pending_)
+    {
+        if (const auto* nav = std::get_if<Navigation>(&input))
+            apply(*nav, time);
+        else if (const auto* var = std::get_if<Variable>(&input))
+        {
+            Value value;
+            value.is_string = var->value_case() == Variable::kSval;
+            value.d = var->dval();
+            value.s = var->sval();
+            apply_variable(var->key(), value, seconds(var->time(), time));
+        }
+        else
+            apply(std::get<Command>(input), time);
+    }
+    pending_.clear();
 }
 
 void Helm::Impl::apply(const Navigation& nav, double time)
