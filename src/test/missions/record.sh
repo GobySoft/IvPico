@@ -141,6 +141,10 @@ record() {
             [ -e "${bhv}" ] || continue
             cp "${bhv}" "${fixture}/$(basename "${bhv}" ._bhv).bhv"
         done
+        # pHelmIvP only asks pLogger to copy its behavior files once it has started
+        if ! ls "${fixture}"/*.bhv > /dev/null 2>&1; then
+            cp "${work}/runs/${mission}"/*.bhv "${fixture}/"
+        fi
     done
 }
 

@@ -8,6 +8,8 @@ s2_bravo      bravo.moos    10    600      DEPLOY=true MOOS_MANUAL_OVERRIDE=fals
 s3_charlie    charlie.moos  10    600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
 s4_delta      delta.moos    10    600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
 s5_echo       echo.moos     10    600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
+# s7_golf parks soon after DEPLOY: no behavior decides course or speed (MissingDecVars)
 s7_golf       golf.moos     10    600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
 s10_juliet    juliet.moos   10    600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
+# x1_legs is MALCONFIG: its alpha.bhv uses BHV_LegRun parameters this MOOS-IvP rejects
 x1_legs       alpha.moos    10    600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false

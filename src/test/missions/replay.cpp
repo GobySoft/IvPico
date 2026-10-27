@@ -148,6 +148,7 @@ HelmConfig read_config(const fs::path& moos_file, const fs::path& dir)
     HelmConfig cfg;
     std::ifstream in(moos_file);
     bool in_block = false, in_helm = false;
+    std::vector<std::string> helm_lines;
     for (std::string line; std::getline(in, line);)
     {
         line = trim(line.substr(0, line.find("//")));
@@ -174,9 +175,18 @@ HelmConfig read_config(const fs::path& moos_file, const fs::path& dir)
             in_block = in_helm = false;
             continue;
         }
-        if (!in_block || !in_helm)
-            continue;
+        if (in_block && in_helm)
+            helm_lines.push_back(line);
+    }
 
+    // MOOS's mission reader hands pHelmIvP its configuration in reverse order,
+    // which sets the order of the domain variables
+    for (auto it = helm_lines.rbegin(); it != helm_lines.rend(); ++it)
+    {
+        const std::string& line = *it;
+        const auto eq = line.find('=');
+        const std::string key = lower(trim(line.substr(0, eq)));
+        const std::string value = eq == std::string::npos ? "" : trim(line.substr(eq + 1));
         const bool truth = lower(value) == "true";
         if (key == "behaviors")
             cfg.add_behavior_file((dir / fs::path(value).filename()).string());
