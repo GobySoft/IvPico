@@ -48,6 +48,8 @@ struct Value
     bool is_string{false};
     double d{0};
     std::string s;
+    // posted by the helm's "initialize"
+    bool init{false};
 };
 
 Value make_value(const VarDataPair& pair)
@@ -342,12 +344,6 @@ const Output& Helm::Impl::iterate(double time)
     output_ = Output();
     curr_time_ = time;
 
-    // the previous iteration's posts reach the helm first, as they reached the MOOSDB first
-    auto echo = std::move(posted_);
-    posted_.clear();
-    const double echo_time = posted_time_ == 0 ? time : posted_time_;
-    posted_time_ = time;
-
     info_buffer_.setCurrTime(time);
     ledger_.setCurrTimeUTC(time);
     if (!started_)
@@ -358,6 +354,13 @@ const Output& Helm::Impl::iterate(double time)
             apply_pending(time);
         start(time);
     }
+
+    // The previous iteration's posts (or the startup's) reach the helm first,
+    // as they reached the MOOSDB first
+    auto echo = std::move(posted_);
+    posted_.clear();
+    const double echo_time = posted_time_ == 0 ? time : posted_time_;
+    posted_time_ = time;
 
     if (status_ != Status::MALCONFIG)
     {
@@ -532,6 +535,18 @@ void Helm::Impl::apply(const Command& command, double time)
 // HelmIvP::OnNewMail for one message
 void Helm::Impl::apply_variable(const std::string& var, const Value& value, double msg_time)
 {
+    // pHelmIvP has set the helm's own "initialize" values already, but still
+    // acts on them (e.g. initialize MOOS_MANUAL_OVERRIDE = false)
+    auto store = [&]()
+    {
+        if (value.init)
+            return;
+        if (value.is_string)
+            info_buffer_.setValue(var, value.s, msg_time);
+        else
+            info_buffer_.setValue(var, value.d, msg_time);
+    };
+
     const std::string sval = value.s;
     if (var == "MOOS_MANUAL_OVERRIDE" || var == "MOOS_MANUAL_OVERIDE")
     {
@@ -539,7 +554,7 @@ void Helm::Impl::apply_variable(const std::string& var, const Value& value, doub
             set_manual_override(false);
         else if (toupper(sval) == "TRUE")
             set_manual_override(true);
-        info_buffer_.setValue(var, sval, msg_time);
+        store();
     }
     // Status is always complete, so there's nothing to rejournal
     else if (var == "IVPHELM_STATE" || var == "DB_CLIENTS" || var == "RESTART_HELM" ||
@@ -561,14 +576,12 @@ void Helm::Impl::apply_variable(const std::string& var, const Value& value, doub
             info_buffer_.setValue(toupper(vname) + "_NAV_GROUP", ledger_.getGroup(vname));
             info_buffer_.setValue(toupper(vname) + "_NAV_TYPE", ledger_.getType(vname));
         }
-        info_buffer_.setValue(var, sval, msg_time);
+        store();
     }
     else if (var == "HELM_MAP_CLEAR")
         refresh_pending_ = true;
-    else if (value.is_string)
-        info_buffer_.setValue(var, sval, msg_time);
     else
-        info_buffer_.setValue(var, value.d, msg_time);
+        store();
 }
 
 void Helm::Impl::set_manual_override(bool on)
@@ -681,8 +694,9 @@ void Helm::Impl::post_initial_variables(bool deferred)
                 info_buffer_.setValue(var, value.s);
             else
                 info_buffer_.setValue(var, value.d);
-            // the MOOSDB echoes these too, but pHelmIvP ignores that echo (HELM_VAR_INIT)
             add_posting(Posting::INITIALIZE, "", var, value);
+            value.init = true;
+            notify(var, value);
         }
     }
 }
