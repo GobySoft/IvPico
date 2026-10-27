@@ -7,4 +7,5 @@
 gobyd config/gobyd.pb.cfg
 goby_frontseat_interface_basic_simulator config/frontseat.pb.cfg
 goby_helm_ivp config/helm_ivp.pb.cfg
-goby_liaison config/liaison.pb.cfg
+# goby_liaison (from the goby3-gui package) shows and publishes messages at http://localhost:50001
+# goby_liaison config/liaison.pb.cfg
