@@ -1,0 +1,45 @@
+name: Record missions
+
+# Re-records the replay tests' fixtures (src/test/missions/fixtures) under
+# pHelmIvP. Download the "fixtures" artifact and commit it.
+on:
+  workflow_dispatch:
+    inputs:
+      missions:
+        description: "Missions to record, separated by spaces (default: all of missions.txt)"
+        required: false
+        default: ""
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  record:
+    runs-on: ubuntu-24.04
+    container: ubuntu:24.04
+    steps:
+      - name: Install git
+        run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+
+      - uses: actions/checkout@v5
+
+      - name: Init
+        run: |
+          git config --global --add safe.directory '*'
+          ./init.sh
+          # all of MOOS-IvP, not just the helm libraries
+          apt-get install -y --no-install-recommends make patch
+
+      - name: Record
+        env:
+          MISSIONS: ${{ inputs.missions }}
+        run: src/test/missions/record.sh ${MISSIONS}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fixtures
+          path: src/test/missions/fixtures
