@@ -23,21 +23,18 @@ One way to think of this project is as a generator for the equivalent of the MOO
 
 *This section was written by Claude.*
 
-`init.sh` checks out the submodules and installs the Ubuntu packages needed to build them and IvPico. `build.sh` then builds openocean-messages from its submodule (into `build/external/openocean-messages`) and IvPico against it (into `build/`):
+`init.sh` checks out the submodules and installs the Ubuntu packages needed to build them and IvPico. `build.sh` then builds, all in `build/`:
+
+- openocean-messages, into `build/external/openocean-messages`;
+- MOOS-IvP's helm libraries (`IVP_BUILD_HELM_LIBS_ONLY`, as shared libraries, without MOOS or its apps), into `build/external/moos-ivp`, installed into `build/external/install` for `find_package(IVP)`;
+- IvPico, against both.
 
 ```
 ./init.sh
 ./build.sh
+ctest --test-dir build
 ```
 
 `build.sh` passes any arguments on to IvPico's CMake, and `BUILD_DIR` overrides the build directory.
-
-MOOS-IvP isn't built by IvPico yet. To build its libraries and non-GUI apps (`build-moos.sh` calls skipping its GUI tools `--minrobot`, and MOOSGeodesy downloads PROJ while building):
-
-```
-cd external/moos-ivp
-./build-moos.sh --minrobot
-./build-ivp.sh --nogui
-```
 
 To update a submodule, check out the commit you want in it and commit the new pointer, e.g. `git -C external/openocean-messages pull origin main && git add external/openocean-messages`.

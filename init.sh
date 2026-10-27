@@ -25,9 +25,8 @@ if [ "$(id -u)" -ne 0 ]; then
     SUDO=sudo
 fi
 
-# moos-ivp without its GUI tools (build-moos.sh --minrobot, build-ivp.sh --nogui), so not FLTK or X.
-# MOOSGeodesy downloads PROJ and patches it while building.
-packages=(cmake ninja-build make g++ patch git ca-certificates protobuf-compiler libprotobuf-dev)
+# moos-ivp's helm libraries (IVP_BUILD_HELM_LIBS_ONLY) need only CMake and a compiler
+packages=(cmake ninja-build g++ git ca-certificates protobuf-compiler libprotobuf-dev)
 $SUDO apt-get update
 $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
 
