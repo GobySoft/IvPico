@@ -30,7 +30,7 @@ jobs:
       - name: Init
         run: |
           git config --global --add safe.directory '*'
-          ./init.sh
+          ./init.sh --no-goby
           # all of MOOS-IvP, not just the helm libraries
           apt-get install -y --no-install-recommends make patch
 
