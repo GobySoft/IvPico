@@ -26,10 +26,10 @@ One way to think of this project is as a generator for the equivalent of the MOO
 
 *This section was written by Claude.*
 
-`init.sh` checks out the submodules and installs the Ubuntu packages needed to build them and IvPico. These include Goby3, for the Goby app, adding [packages.gobysoft.org](http://packages.gobysoft.org)'s continuous builds if apt doesn't already have it; `init.sh --no-goby` leaves Goby3 out, and `build.sh` then skips the Goby app. `build.sh` then builds, all in `build/`:
+`init.sh` checks out the submodules and installs the Ubuntu packages needed to build them and IvPico. These include Goby3, for the Goby app, adding [packages.gobysoft.org](http://packages.gobysoft.org)'s continuous builds if apt doesn't already have it; `init.sh --no-goby` leaves Goby3 out, and `build.sh` then skips the Goby app. `build.sh` then builds, all in `build/`, and installs each into `build/usr`:
 
 - openocean-messages, into `build/external/openocean-messages`;
-- MOOS-IvP's helm libraries (`IVP_BUILD_HELM_LIBS_ONLY`, as shared libraries, without MOOS or its apps), into `build/external/moos-ivp`, installed into `build/external/install` for `find_package(IVP)`;
+- MOOS-IvP's helm libraries (`IVP_BUILD_HELM_LIBS_ONLY`, as shared libraries, without MOOS or its apps), into `build/external/moos-ivp`, installed first so that IvPico can `find_package(IVP)`;
 - IvPico, against both.
 
 ```
@@ -38,7 +38,7 @@ One way to think of this project is as a generator for the equivalent of the MOO
 ctest --test-dir build
 ```
 
-`build.sh` passes any arguments on to IvPico's CMake, and `BUILD_DIR` overrides the build directory.
+`build.sh` passes any arguments on to IvPico's CMake, and `BUILD_DIR` overrides the build directory. Add `build/usr/bin` to your `PATH` to run the installed apps.
 
 To update a submodule, check out the commit you want in it and commit the new pointer, e.g. `git -C external/openocean-messages pull origin main && git add external/openocean-messages`.
 
@@ -51,8 +51,8 @@ To update a submodule, check out the commit you want in it and commit the new po
 To run the alpha mission against Goby's basic frontseat simulator:
 
 ```
-export PATH=$PWD/build/src/bin/goby/helm_ivp:$PATH
-export GOBY_TOOL_LOAD_SHARED_LIBRARY=$PWD/build/src/lib/libivpico_interface.so
+export PATH=$PWD/build/usr/bin:$PATH
+export GOBY_TOOL_LOAD_SHARED_LIBRARY=$PWD/build/usr/lib/libivpico_interface.so
 cd launch/goby/alpha
 goby_launch alpha.launch
 ./deploy.sh

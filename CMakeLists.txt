@@ -11,6 +11,10 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
+include(GNUInstallDirs)
+# installed programs find the libraries installed beside them, e.g. in build.sh's build/usr
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+
 find_package(Protobuf REQUIRED)
 find_package(openocean_messages 0.1 REQUIRED COMPONENTS cpp)
 

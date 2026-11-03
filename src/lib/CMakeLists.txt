@@ -14,3 +14,7 @@ target_link_libraries(ivpico_helm
   PUBLIC ivpico_interface
   PRIVATE IVP::helmivp IVP::geodaid IVP::behaviors IVP::contacts IVP::logic IVP::ivpbuild
           IVP::ivpsolve IVP::ivpcore IVP::mbutil)
+
+install(TARGETS ivpico_interface ivpico_helm
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
