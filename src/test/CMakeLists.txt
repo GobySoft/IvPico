@@ -16,19 +16,23 @@ foreach(fixture ${fixtures})
   endif()
 endforeach()
 
-if(GOBY_FOUND)
-  add_subdirectory(goby)
+# 'goby test' is in Goby builds after 3.6.1, which set GOBY_EXECUTABLE
+if(GOBY_FOUND AND GOBY_EXECUTABLE)
+  set(goby_test_defines
+    -D HELM=$<TARGET_FILE:goby_helm_ivp> -D INTERFACE_LIB=$<TARGET_FILE:ivpico_interface>)
+
+  add_test(NAME goby_helm_ivp
+    COMMAND ${GOBY_EXECUTABLE} test run ${CMAKE_CURRENT_SOURCE_DIR}/goby/helm_ivp/test.yml
+            ${goby_test_defines})
 
   set(simulator_port 54400)
   foreach(mission s1_alpha s2_bravo s3_charlie s4_delta)
     add_test(NAME closed_loop_${mission}
-      COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/missions/goby/run.sh ${mission}
-              $<TARGET_FILE:goby_helm_ivp> $<TARGET_FILE:ivpico_mission_check> ${simulator_port})
+      COMMAND ${GOBY_EXECUTABLE} test run ${CMAKE_CURRENT_SOURCE_DIR}/missions/goby/${mission}/test.yml
+              ${goby_test_defines} -D MISSION=${mission} -D PORT=${simulator_port})
     set_tests_properties(closed_loop_${mission} PROPERTIES TIMEOUT 180)
     math(EXPR simulator_port "${simulator_port} + 1")
   endforeach()
-
-  add_test(NAME goby_helm_ivp
-    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/goby/test_goby_helm_ivp.sh
-            $<TARGET_FILE:goby_helm_ivp> $<TARGET_FILE:ivpico_interface>)
+elseif(GOBY_FOUND)
+  message(STATUS "Skipping the Goby tests: this Goby has no 'goby test' (needs a build after 3.6.1)")
 endif()

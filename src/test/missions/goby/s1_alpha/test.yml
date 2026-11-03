@@ -1,0 +1,38 @@
+# s1_alpha: survey, then return.
+# Times are real seconds: a tenth of mission time.
+include: [../closed_loop.yml]
+
+test:
+  name: s1_alpha closed loop
+  run:
+    - name: mission
+      mode: PARALLEL
+      step:
+        - name: deploy
+          publish:
+            - group: ivpico::helm::variable
+              type: PROTOBUF/ivp.interface.Variable
+              value: 'key: "DEPLOY" sval: "true"'
+              delay: 0.5
+            - group: ivpico::helm::variable
+              type: PROTOBUF/ivp.interface.Variable
+              value: 'key: "MOOS_MANUAL_OVERRIDE" sval: "false"'
+              delay: 0.5
+          expect:
+            # recorded at 370 s of mission time
+            - group: ivpico::helm::posting
+              type: ivp.interface.Posting
+              match: 'key: "RETURN" sval: "true"'
+              timeout: 46
+        - name: no errors
+          expect:
+            - group: ivpico::helm::status
+              type: ivp.interface.Status
+              condition: [{ field: state, op: EQ, value: MALCONFIG }]
+              count: 0
+              timeout: 48
+            - group: ivpico::helm::status
+              type: ivp.interface.Status
+              condition: [{ field: allstop, op: EQ, value: BEHAVIOR_ERROR }]
+              count: 0
+              timeout: 48

@@ -35,15 +35,16 @@ packages=(cmake ninja-build g++ git ca-certificates protobuf-compiler libprotobu
 $SUDO apt-get update
 apt_install "${packages[@]}"
 
-# Goby3, for src/bin/goby, from packages.gobysoft.org
+# Goby3, for src/bin/goby, from packages.gobysoft.org: continuous builds for
+# 'goby test' (newer than 3.6.1)
 keyring=/usr/share/keyrings/gobysoft-archive-keyring.gpg
 if [ ! -f "${keyring}" ]; then
     curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x19478082E2F8D3FE" |
         gpg --dearmor | $SUDO tee "${keyring}" > /dev/null
 fi
 . /etc/os-release
-echo "deb [signed-by=${keyring}] http://packages.gobysoft.org/${ID}/release/ ${VERSION_CODENAME}/" |
-    $SUDO tee /etc/apt/sources.list.d/gobysoft_release.list > /dev/null
+echo "deb [signed-by=${keyring}] http://packages.gobysoft.org/${ID}/continuous/ ${VERSION_CODENAME}/" |
+    $SUDO tee /etc/apt/sources.list.d/gobysoft_continuous.list > /dev/null
 $SUDO apt-get update
 # libgoby3-dev only recommends these, but goby's CMake package links libais.so,
 # and goby_add_app() runs protoc-gen-dccl
