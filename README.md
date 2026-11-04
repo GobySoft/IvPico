@@ -48,15 +48,5 @@ To update a submodule, check out the commit you want in it and commit the new po
 
 `goby_helm_ivp` runs the helm in Goby3. It publishes and subscribes the `ivp.interface` messages on the `ivpico::helm::*` groups (`src/bin/goby/groups.h`), and can stand in for the MOOS helm behind `goby_frontseat_interface` (`frontseat { enable: true }`). `goby_helm_ivp -e` prints an example configuration.
 
-To run the alpha mission against Goby's basic frontseat simulator:
-
-```
-export PATH=$PWD/build/usr/bin:$PATH
-export GOBY_TOOL_LOAD_SHARED_LIBRARY=$PWD/build/usr/lib/libivpico_interface.so
-cd launch/goby/alpha
-goby_launch alpha.launch
-./deploy.sh
-```
-
-`deploy.sh` publishes DEPLOY=true and lifts the manual override with `goby zeromq publish`, which can publish any other `Variable` or `Command` the same way.
+`launch/goby/alpha` runs the alpha mission against Goby's basic frontseat simulator, with OpenCPN as a chart display: see its [README](launch/goby/alpha/README.md).
 
