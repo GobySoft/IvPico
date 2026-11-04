@@ -1,6 +1,3 @@
-[submodule "external/openocean-messages"]
-	path = external/openocean-messages
-	url = https://github.com/openocean-software/openocean-messages.git
 [submodule "external/moos-ivp"]
 	path = external/moos-ivp
 	url = https://github.com/GobySoft/moos-ivp.git

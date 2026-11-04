@@ -19,18 +19,16 @@ One way to think of this project is as a generator for the equivalent of the MOO
   - test: Tests, including replays of MOOS-IvP missions (`test/missions`)
 - launch: Example missions
 - external: Submodules
-  - openocean-messages: [openocean-messages](https://github.com/openocean-software/openocean-messages), for the `Navigation` and `ControlSetpoint` messages
   - moos-ivp: [MOOS-IvP](https://github.com/GobySoft/moos-ivp), for the IvP solver and behaviors
 
 ## Building
 
 *This section was written by Claude.*
 
-`init.sh` checks out the submodules and installs the Ubuntu packages needed to build them and IvPico. These include Goby3, for the Goby app, adding [packages.gobysoft.org](http://packages.gobysoft.org)'s continuous builds if apt doesn't already have it; `init.sh --no-goby` leaves Goby3 out, and `build.sh` then skips the Goby app. `build.sh` then builds, all in `build/`, and installs each into `build/usr`:
+`init.sh` checks out the submodule and installs the Ubuntu packages needed to build it and IvPico. These include [openocean-messages](https://github.com/openocean-software/openocean-messages), for the `Navigation` and `ControlSetpoint` messages, adding [Open Ocean Software](https://github.com/openocean-software/openocean-build)'s continuous builds (apt.oceansoft.org) if apt doesn't already have it, and Goby3, for the Goby app, adding [packages.gobysoft.org](http://packages.gobysoft.org)'s continuous builds if apt doesn't already have it; `init.sh --no-goby` leaves Goby3 out, and `build.sh` then skips the Goby app. `build.sh` then builds, all in `build/`, and installs each into `build/usr`:
 
-- openocean-messages, into `build/external/openocean-messages`;
 - MOOS-IvP's helm libraries (`IVP_BUILD_HELM_LIBS_ONLY`, as shared libraries, without MOOS or its apps), into `build/external/moos-ivp`, installed first so that IvPico can `find_package(IVP)`;
-- IvPico, against both.
+- IvPico, against them and openocean-messages.
 
 ```
 ./init.sh
@@ -40,7 +38,7 @@ ctest --test-dir build
 
 `build.sh` passes any arguments on to IvPico's CMake, and `BUILD_DIR` overrides the build directory. Add `build/usr/bin` to your `PATH` to run the installed apps.
 
-To update a submodule, check out the commit you want in it and commit the new pointer, e.g. `git -C external/openocean-messages pull origin main && git add external/openocean-messages`.
+To update the submodule, check out the commit you want in it and commit the new pointer, e.g. `git -C external/moos-ivp pull origin ivp-without-moos && git add external/moos-ivp`.
 
 ## Goby app
 
