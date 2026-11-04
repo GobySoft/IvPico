@@ -1,0 +1,302 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% LOG FILE:       ./MOOSLog_27_10_2026_____07_46_32/MOOSLog_27_10_2026_____07_46_32._moos
+%% FILE OPENED ON  Thu Jan  1 00:00:00 1970
+%% LOGSTART           17930871923.37738
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//-------------------------------------------------
+// NAME: M. Benjamin, MIT CSAIL
+// FILE: echo.moos
+//-------------------------------------------------
+
+ServerHost   = localhost
+ServerPort   = 9000
+Community    = echo
+//----  Next Line was commented and replaced with a command line overload ---- //
+//MOOSTimeWarp = 1    (default)
+MOOSTimeWarp = 10
+
+LatOrigin  = 43.825300 
+LongOrigin = -70.330400 
+
+//------------------------------------------
+// Antler configuration  block
+
+ProcessConfig = ANTLER
+{
+  Run = uTimerScript @ NewConsole = false ~ uTimerScript_record
+  MSBetweenLaunches = 200
+
+  Run = MOOSDB          @ NewConsole = false
+  Run = pLogger @ NewConsole = false
+  Run = uSimMarine      @ NewConsole = false
+  Run = pNodeReporter   @ NewConsole = false
+  Run = pMarinePID      @ NewConsole = false
+  Run = pMarineViewer   @ NewConsole = false
+  Run = pHelmIvP        @ NewConsole = false
+  Run = uTimerScript    @ NewConsole = false
+  Run = uXMS            @ NewConsole = false
+  Run = uMemWatch       @ NewConsole = false
+}
+
+//------------------------------------------
+// uXMS config block
+
+ProcessConfig = uXMS
+{
+  AppTick   = 4
+  CommsTick = 4
+  
+  var = IVPHELM_ITER
+  var = IVPHELM_DOMAIN
+  var = IVPHELM_BHV_CNT
+  var = IVPHELM_BHV_CNT_EVER
+  var = IVPHELM_ALLSTOP
+  var = IVPHELM_STATE
+}
+
+//------------------------------------------
+// uMemWatch config block
+
+ProcessConfig = uMemWatch                                       
+{                                                               
+  AppTick   = 4                                                 
+  CommsTick = 4                                                 
+                                                                
+  absolute_time_gap = 1   // In Seconds, Default is 1.          
+                                                                
+  watch_only = pHelmIvP,pMarineViewer
+}                                  
+
+
+//------------------------------------------
+// pLogger config block
+
+ProcessConfig = pLogger
+{
+  Log = AUTO_SPAWN @ 0 NOSYNC
+  Log = BEARING_POINT @ 0 NOSYNC
+  Log = BHV_IPF @ 0 NOSYNC
+  Log = BHV_SETTINGS @ 0 NOSYNC
+  Log = BHV_STATUS @ 0 NOSYNC
+  Log = BHV_WARNING @ 0 NOSYNC
+  Log = CYCLE_INDEX @ 0 NOSYNC
+  Log = DEPLOY @ 0 NOSYNC
+  Log = DESIRED_HEADING @ 0 NOSYNC
+  Log = DESIRED_SPEED @ 0 NOSYNC
+  Log = IVPHELM_ALLSTOP @ 0 NOSYNC
+  Log = IVPHELM_BHV_ACTIVE @ 0 NOSYNC
+  Log = IVPHELM_BHV_ACTIVE_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_CNT_EVER @ 0 NOSYNC
+  Log = IVPHELM_BHV_DISABLED_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_IDLE @ 0 NOSYNC
+  Log = IVPHELM_BHV_IDLE_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_RUNNING @ 0 NOSYNC
+  Log = IVPHELM_BHV_RUNNING_CNT @ 0 NOSYNC
+  Log = IVPHELM_COMPLETED_PENDING @ 0 NOSYNC
+  Log = IVPHELM_CPU @ 0 NOSYNC
+  Log = IVPHELM_CREATE_CPU @ 0 NOSYNC
+  Log = IVPHELM_DOMAIN @ 0 NOSYNC
+  Log = IVPHELM_IPF_CNT @ 0 NOSYNC
+  Log = IVPHELM_ITER @ 0 NOSYNC
+  Log = IVPHELM_LEDGER_SUMMARY @ 0 NOSYNC
+  Log = IVPHELM_LIFE_EVENT @ 0 NOSYNC
+  Log = IVPHELM_LOOP_CPU @ 0 NOSYNC
+  Log = IVPHELM_MODE @ 0 NOSYNC
+  Log = IVPHELM_MODESET @ 0 NOSYNC
+  Log = IVPHELM_REGISTER @ 0 NOSYNC
+  Log = IVPHELM_STATE @ 0 NOSYNC
+  Log = IVPHELM_STATEVARS @ 0 NOSYNC
+  Log = IVPHELM_SUMMARY @ 0 NOSYNC
+  Log = IVPHELM_TOTAL_PCS_CACHED @ 0 NOSYNC
+  Log = IVPHELM_TOTAL_PCS_FORMED @ 0 NOSYNC
+  Log = IVPHELM_UPDATEVARS @ 0 NOSYNC
+  Log = MOOS_DEBUG @ 0 NOSYNC
+  Log = MOOS_MANUAL_OVERRIDE @ 0 NOSYNC
+  Log = NAV_SPEED @ 0 NOSYNC
+  Log = NAV_X @ 0 NOSYNC
+  Log = NAV_Y @ 0 NOSYNC
+  Log = PHELMIVP_PID @ 0 NOSYNC
+  Log = PHELMIVP_STATUS @ 0 NOSYNC
+  Log = PLOGGER_CMD @ 0 NOSYNC
+  Log = RETURN @ 0 NOSYNC
+  Log = TURN_RATE @ 0 NOSYNC
+  Log = UPDATES_RETURN @ 0 NOSYNC
+  Log = VIEW_POINT @ 0 NOSYNC
+  Log = VIEW_SEGLIST @ 0 NOSYNC
+  Log = WPT_INDEX @ 0 NOSYNC
+  Log = WPT_ODO @ 0 NOSYNC
+  Log = WPT_STAT @ 0 NOSYNC
+  AppTick   = 4
+  CommsTick = 4
+
+  SyncLog = false
+  AsyncLog = true
+  WildCardLogging = true
+
+  LogAuxSrc = true
+}
+
+//------------------------------------------
+// uSimMarine config block
+
+ProcessConfig = uSimMarine
+{
+  AppTick	= 10
+  CommsTick	= 10
+
+  start_x       = 0
+  start_y       = -10
+  start_speed   = 0
+  start_heading = 180
+
+  prefix        = NAV
+}
+
+//------------------------------------------
+// pHelmIvP config block
+
+ProcessConfig = pHelmIvP
+{
+  AppTick    = 4
+  CommsTick  = 4
+
+  behaviors  = echo.bhv
+  verbose    = quiet
+  domain     = course:0:359:360
+  domain     = speed:0:4:21
+}
+
+//------------------------------------------
+// pMarinePID config block
+
+ProcessConfig = pMarinePID
+{
+  AppTick    = 20
+  CommsTick  = 20
+
+  verbose       = true
+  depth_control = false
+
+  // Yaw PID controller
+  yaw_pid_kp		 = 0.5
+  yaw_pid_kd		 = 0.0
+  yaw_pid_ki		 = 0.0
+  yaw_pid_integral_limit = 0.07
+
+  // Speed PID controller
+  speed_pid_kp		 = 1.0
+  speed_pid_kd		 = 0.0
+  speed_pid_ki		 = 0.0
+  speed_pid_integral_limit = 0.07
+
+  //MAXIMUMS
+  maxrudder    = 100
+  maxthrust    = 100
+
+  // A non-zero SPEED_FACTOR overrides use of SPEED_PID
+  // Will set DESIRED_THRUST = DESIRED_SPEED * SPEED_FACTOR
+  speed_factor = 20
+}
+
+//------------------------------------------
+// pMarineViewer config block
+
+ProcessConfig = pMarineViewer
+{
+  AppTick    = 4
+  CommsTick  = 4
+
+  tiff_file            = forrest19.tif
+  set_pan_x            = -90
+  set_pan_y            = -240
+  zoom                 = 0.65
+  vehicle_shape_scale  = 1.8
+  hash_delta           = 50
+  hash_shade           = 0.4
+  hash_viewable        = true
+
+  // Appcast configuration
+  appcast_height       = 75
+  appcast_width        = 30
+  appcast_viewable     = true
+  appcast_color_scheme = indigo
+  nodes_font_size      = medium
+  procs_font_size      = medium
+  appcast_font_size    = medium
+
+  scope  = PHELMIVP_MEM
+  scope  = HVARS
+  scope  = BCOUNT
+  scope  = BEARING_POINT
+  scope  = VIEW_SEGLIST
+  scope  = VIEW_POINT
+  scope  = VIEW_POLYGON
+  scope  = NAV_X
+  scope  = NAV_Y
+  scope  = MVIEWER_LCLICK
+  scope  = MVIEWER_RCLICK
+
+  left_context[bng_point] = BEARING_POINT = name=bng-line$(X)-$(Y) # bearing_point=$(X),$(Y)
+
+  button_one = DEPLOY # DEPLOY=true
+  button_one = MOOS_MANUAL_OVERRIDE=false # RETURN=false
+  button_two = RETURN # RETURN=true
+  button_three = AUTO_SPAWN # AUTO_SPAWN=true
+
+  action  = MENU_KEY=deploy # DEPLOY = true # RETURN = false
+  action+ = MENU_KEY=deploy # MOOS_MANUAL_OVERRIDE=false
+  action+ = RETURN=true
+  action  = BEARING_POINT = show_pt=true
+  action+ = BEARING_POINT = show_pt=false
+  action  = BEARING_POINT = line_pct=0
+  action  = BEARING_POINT = line_pct=25
+  action  = BEARING_POINT = line_pct=50
+  action  = BEARING_POINT = line_pct=75
+  action+ = BEARING_POINT = line_pct=100
+  action  = BEARING_POINT = "name=bng-line # line_pct=0"
+  action  = BEARING_POINT = "name=bng-line # line_pct=50"
+  action+ = BEARING_POINT = "name=bng-line # line_pct=100"
+  action  = AUTO_SPAWN = true
+  action+ = AUTO_SPAWN = false
+}
+
+//------------------------------------------
+// pNodeReporter config block
+
+ProcessConfig = pNodeReporter
+{
+  AppTick	= 2
+  CommsTick	= 2
+
+  vessel_type   = KAYAK
+}
+
+//------------------------------------------
+// uTimerScript config block
+
+ProcessConfig = uTimerScript
+{
+  AppTick	= 4
+  CommsTick	= 4
+
+  paused     = false
+  reset_max  = nolimit
+  reset_time = end
+  condition  = AUTO_SPAWN=true
+
+  randvar = varname=FOO, min=1, max=800, key=at_reset
+  randvar = varname=DUR, min=25, max=50, key=at_reset
+  randvar = varname=X, min=0, max=150, key=at_reset
+  randvar = varname=Y, min=-150, max=0, key=at_reset
+
+  event = var=BEARING_POINT, val="name=B$[TCOUNT] # bearing_point=$[X],$[Y] # duration=$[DUR] # line_pct=100", time=0:2
+}
+ProcessConfig = uTimerScript_record
+{
+  condition = (IVPHELM_STATE = PARK) or (IVPHELM_STATE = DRIVE)
+  event = var=DEPLOY, val=true, time=5
+  event = var=MOOS_MANUAL_OVERRIDE, val=false, time=5
+}
+
+

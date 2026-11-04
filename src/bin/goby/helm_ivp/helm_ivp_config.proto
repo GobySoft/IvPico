@@ -1,0 +1,48 @@
+syntax = "proto2";
+
+import "goby/protobuf/option_extensions.proto";
+import "goby/middleware/protobuf/app_config.proto";
+import "goby/zeromq/protobuf/interprocess_config.proto";
+import "interface/config.proto";
+
+package ivpico.goby.protobuf;
+
+message HelmIvPConfig
+{
+    optional .goby.middleware.protobuf.AppConfig app = 1;
+    optional .goby.zeromq.protobuf.InterProcessPortalConfig interprocess = 2
+        [(.goby.field) = { cfg { env: "GOBY_INTERPROCESS" } }];
+
+    optional double loop_freq = 10 [
+        default = 4,
+        (.goby.field).description = "Helm iterations per second (pHelmIvP's AppTick)"
+    ];
+
+    optional ivp.interface.HelmConfig helm = 11 [(.goby.field) = {
+        description: "pHelmIvP's configuration. helm.ownship defaults to interprocess.platform",
+        example: "behavior_file: \"alpha.bhv\" domain { name: \"course\" low: 0 high: 359 points: 360 } domain { name: \"speed\" low: 0 high: 4 points: 21 }"
+    }];
+
+    message FrontSeat
+    {
+        optional bool enable = 1 [
+            default = false,
+            (.goby.field).description = "Bridge to goby_frontseat_interface"
+        ];
+        optional bool use_node_status = 2 [
+            default = true,
+            (.goby.field).description = "Use frontseat NodeStatus as the vehicle's navigation"
+        ];
+        optional bool publish_desired_course = 3 [
+            default = true,
+            (.goby.field).description = "Publish each Solution as a frontseat DesiredCourse"
+        ];
+        optional bool publish_helm_state = 4 [
+            default = true,
+            (.goby.field).description = "Publish HelmStateReport every loop"
+        ];
+    }
+    optional FrontSeat frontseat = 12;
+
+    extensions 1000 to max;
+}

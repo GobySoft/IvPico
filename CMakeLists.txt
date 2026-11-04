@@ -9,4 +9,26 @@ endif()
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
+include(GNUInstallDirs)
+# installed programs find the libraries installed beside them, e.g. in build.sh's build/usr
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+
+find_package(Protobuf REQUIRED)
+find_package(openocean_messages 0.1 REQUIRED COMPONENTS cpp)
+
+# MOOS-IvP's helm libraries (IVP_BUILD_HELM_LIBS_ONLY)
+find_package(IVP CONFIG REQUIRED)
+
+find_package(GOBY 3.0 COMPONENTS zeromq OPTIONAL_COMPONENTS moos)
+if(NOT GOBY_FOUND)
+  message(STATUS "Goby3 not found: not building the Goby app")
+elseif(GOBY_moos_FOUND)
+  # goby_moos links MOOS::MOOS
+  find_package(MOOS 10 QUIET)
+endif()
+
+include(CTest)
+
 add_subdirectory(src)

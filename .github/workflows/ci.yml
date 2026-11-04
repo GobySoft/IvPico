@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  build:
+    name: Ubuntu ${{ matrix.ubuntu }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    container: ubuntu:${{ matrix.ubuntu }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu: ["24.04", "26.04"]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      # Without git, actions/checkout downloads an archive, and init.sh can't check out the submodules
+      - name: Install git
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: |
+          git config --global --add safe.directory '*'
+          ./init.sh
+      - name: Build
+        run: ./build.sh
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --no-tests=error

@@ -17,3 +17,7 @@ Guidance for Claude when working in this repository.
 - When in doubt leave the documentation unwritten, but provide an outline for the human developers to use to fill out the rest of the document.
 - Prefer figures to text when an idea can be better explained graphically.
 
+## Branches
+
+- Name a feature branch with a short description of the change: `add-goby-test-tool`, `fix-udpm-reassembly`. Name a bug fix branch with the issue it closes after the description: `fix-bad-bug/13`
+

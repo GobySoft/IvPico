@@ -1,0 +1,44 @@
+# goby_helm_ivp's frontseat bridge, end to end:
+#
+#  1. a constant-heading behavior (course 90) with the helm starting in DRIVE;
+#  2. one frontseat NodeStatus gives the helm its navigation, converted to x/y
+#     with the app's datum (time 0: the helm uses its own clock);
+#  3. the helm should then publish a DesiredCourse with heading 90 and a
+#     HelmStateReport of HELM_DRIVE, and its own Status in DRIVE.
+#
+# Set with -D: HELM (goby_helm_ivp), INTERFACE_LIB (libivpico_interface.so)
+load_shared_library: ["${INTERFACE_LIB}"]
+
+endpoint:
+  - { name: vehicle, zeromq: { platform: ivpico_helm_ivp } }
+
+fixture:
+  - name: gobyd
+    command: gobyd -v
+    env: ['GOBY_INTERPROCESS=platform: "ivpico_helm_ivp"']
+    ready: { output_regex: "gobyd is ready" }
+  - name: helm
+    command: ${HELM} helm_ivp.pb.cfg
+    env: ['GOBY_INTERPROCESS=platform: "ivpico_helm_ivp"']
+
+test:
+  name: goby_helm_ivp frontseat bridge
+  require_app: [{ name: [goby_helm_ivp] }]
+  run:
+    - name: navigation in, desired course out
+      publish:
+        - group: goby::middleware::frontseat::node_status
+          type: PROTOBUF/goby.middleware.frontseat.protobuf.NodeStatus
+          value: 'time: 0 name: "test" global_fix { lat: 43.8 lon: -70.3 } pose { heading: 0 } speed { over_ground: 0 }'
+      expect:
+        - group: goby::middleware::frontseat::desired_course
+          type: goby.middleware.frontseat.protobuf.DesiredCourse
+          condition:
+            - { field: heading, op: GE, value: 89.99 }
+            - { field: heading, op: LE, value: 90.01 }
+        - group: goby::middleware::frontseat::helm_state
+          type: goby.middleware.frontseat.protobuf.HelmStateReport
+          match: "state: HELM_DRIVE"
+        - group: ivpico::helm::status
+          type: ivp.interface.Status
+          match: "state: DRIVE"

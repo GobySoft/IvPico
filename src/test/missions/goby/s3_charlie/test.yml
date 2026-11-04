@@ -1,0 +1,42 @@
+# s3_charlie: loiter, and still driving at the end.
+# Times are real seconds: a tenth of mission time.
+include: [../closed_loop.yml]
+
+test:
+  name: s3_charlie closed loop
+  run:
+    - name: mission
+      mode: PARALLEL
+      step:
+        - name: deploy
+          publish:
+            - group: ivpico::helm::variable
+              type: PROTOBUF/ivp.interface.Variable
+              value: 'key: "DEPLOY" sval: "true"'
+              delay: 0.5
+            - group: ivpico::helm::variable
+              type: PROTOBUF/ivp.interface.Variable
+              value: 'key: "MOOS_MANUAL_OVERRIDE" sval: "false"'
+              delay: 0.5
+          expect:
+            - group: ivpico::helm::posting
+              type: ivp.interface.Posting
+              match: 'key: "MODE" sval: "ACTIVE:LOITERING"'
+              timeout: 1
+        - name: no errors
+          expect:
+            - group: ivpico::helm::status
+              type: ivp.interface.Status
+              condition: [{ field: state, op: EQ, value: MALCONFIG }]
+              count: 0
+              timeout: 20
+            - group: ivpico::helm::status
+              type: ivp.interface.Status
+              condition: [{ field: allstop, op: EQ, value: BEHAVIOR_ERROR }]
+              count: 0
+              timeout: 20
+    - name: still driving
+      expect:
+        - group: ivpico::helm::status
+          type: ivp.interface.Status
+          match: "state: DRIVE"

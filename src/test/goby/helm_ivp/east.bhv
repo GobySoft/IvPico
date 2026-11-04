@@ -1,0 +1,6 @@
+Behavior = BHV_ConstantHeading
+{
+  name     = east
+  heading  = 90
+  duration = no-time-limit
+}

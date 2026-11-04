@@ -12,17 +12,41 @@ One way to think of this project is as a generator for the equivalent of the MOO
 - src: Source code
   - lib: Library source
     - interface: Interface messages (Protobuf)
+    - helm: The helm, pHelmIvP without MOOS (`ivpico::helm::Helm`)
   - bin: Binary source
-    - goby: Goby middleware app
+    - goby: Goby middleware app (`goby_helm_ivp`)
     - ros: ROS middleware node
+  - test: Tests, including replays of MOOS-IvP missions (`test/missions`)
+- launch: Example missions
+- external: Submodules
+  - openocean-messages: [openocean-messages](https://github.com/openocean-software/openocean-messages), for the `Navigation` and `ControlSetpoint` messages
+  - moos-ivp: [MOOS-IvP](https://github.com/GobySoft/moos-ivp), for the IvP solver and behaviors
 
 ## Building
 
 *This section was written by Claude.*
 
-The interface messages use `Navigation` and `ControlSetpoint` from [openocean-messages](https://github.com/openocean-software/openocean-messages), found with `find_package(openocean_messages)`: install it, or point CMake at its build directory:
+`init.sh` checks out the submodules and installs the Ubuntu packages needed to build them and IvPico. These include Goby3, for the Goby app, adding [packages.gobysoft.org](http://packages.gobysoft.org)'s continuous builds if apt doesn't already have it; `init.sh --no-goby` leaves Goby3 out, and `build.sh` then skips the Goby app. `build.sh` then builds, all in `build/`, and installs each into `build/usr`:
+
+- openocean-messages, into `build/external/openocean-messages`;
+- MOOS-IvP's helm libraries (`IVP_BUILD_HELM_LIBS_ONLY`, as shared libraries, without MOOS or its apps), into `build/external/moos-ivp`, installed first so that IvPico can `find_package(IVP)`;
+- IvPico, against both.
 
 ```
-cmake -S . -B build -Dopenocean_messages_DIR=/path/to/openocean-messages/build
-cmake --build build
+./init.sh
+./build.sh
+ctest --test-dir build
 ```
+
+`build.sh` passes any arguments on to IvPico's CMake, and `BUILD_DIR` overrides the build directory. Add `build/usr/bin` to your `PATH` to run the installed apps.
+
+To update a submodule, check out the commit you want in it and commit the new pointer, e.g. `git -C external/openocean-messages pull origin main && git add external/openocean-messages`.
+
+## Goby app
+
+*This section was written by Claude.*
+
+`goby_helm_ivp` runs the helm in Goby3. It publishes and subscribes the `ivp.interface` messages on the `ivpico::helm::*` groups (`src/bin/goby/groups.h`), and can stand in for the MOOS helm behind `goby_frontseat_interface` (`frontseat { enable: true }`). `goby_helm_ivp -e` prints an example configuration.
+
+`launch/goby/alpha` runs the alpha mission against Goby's basic frontseat simulator, with OpenCPN as a chart display: see its [README](launch/goby/alpha/README.md).
+
