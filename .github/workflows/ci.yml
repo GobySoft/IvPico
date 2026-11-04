@@ -29,14 +29,9 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
-      # Without git, actions/checkout downloads an archive, and init.sh can't check out the submodules
-      - name: Install git
-        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git
       - uses: actions/checkout@v5
       - name: Install dependencies
-        run: |
-          git config --global --add safe.directory '*'
-          ./init.sh
+        run: ./init.sh
       - name: Build
         run: ./build.sh
       - name: Test
