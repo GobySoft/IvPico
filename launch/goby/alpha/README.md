@@ -11,6 +11,13 @@ flowchart LR
   fs -- "NodeStatus" --> helm
   fs -- "NodeStatus" --> ocpn["goby_opencpn_interface"]
   ocpn -- "AIS, TCP 54000" --> opencpn["OpenCPN"]
+  fs -- "NodeStatus" --> gw["goby_moos_gateway"]
+  helm -- "Posting, Status" --> gw
+  gw -- "buttons (Variable)" --> helm
+  subgraph moos["MOOS (viewer.launch)"]
+    gw <--> db["MOOSDB"] <--> pnr["pNodeReporter"]
+    db <--> pmv["pMarineViewer"]
+  end
 ```
 
 ## Running
@@ -26,6 +33,26 @@ goby_launch alpha.launch
 ```
 
 `deploy.sh` publishes DEPLOY=true and lifts the manual override with `goby zeromq publish`, which can publish any other `Variable` or `Command` the same way.
+
+As in MOOS-IvP's alpha, the helm parks when the survey is done (pHelmIvP's `park_on_allstop`); deploy again to return.
+
+## Viewing in pMarineViewer
+
+`viewer.launch` shows the vehicle in pMarineViewer as in MOOS-IvP's alpha mission, with its buttons (DEPLOY, RETURN, ...) working. Start it after `alpha.launch`:
+
+```
+goby_launch viewer.launch
+```
+
+It runs a MOOS community (`alpha.moos`), which `goby_moos_gateway` with IvPico's plugin (`src/bin/goby/moos_gateway`) gives what pHelmIvP and its navigation would post: `NAV_*`, the helm's postings (`VIEW_*`, `WPT_STAT`, ...) and `IVPHELM_*`. The MOOS variables listed in `config/moos_gateway.pb.cfg` go back to the helm as `Variable`s.
+
+## Changing the datum and time warp
+
+```
+./set_datum_warp.sh --datum 42.358456 -71.087589 --warp 5
+```
+
+sets them in every configuration (and `alpha.moos`), starts the vehicle at the datum, and chooses the MOOS-IvP image covering it for pMarineViewer. With no options it prints the current settings.
 
 ## Viewing in OpenCPN
 
