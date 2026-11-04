@@ -60,6 +60,9 @@ if ${goby}; then
     # libgoby3-dev only recommends these, but goby's CMake package links libais.so,
     # and goby_add_app() runs protoc-gen-dccl
     apt_install libgoby3-dev goby3-apps libais-dev dccl5-compiler
+    # pMarineViewer for the Goby launches (viewer.launch), through goby_moos_gateway;
+    # MOOS-IvP's apps need libmoos-ivp but don't depend on it
+    apt_install libgoby3-moos-dev goby3-moos moosdb10 moos-ivp-apps moos-ivp-gui libmoos-ivp
 fi
 
 external/openocean-messages/init.sh --cxx

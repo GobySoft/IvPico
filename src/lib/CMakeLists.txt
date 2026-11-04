@@ -8,7 +8,7 @@ protobuf_generate(
 target_include_directories(ivpico_interface PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
 target_link_libraries(ivpico_interface PUBLIC openocean_messages::openocean_messages)
 
-add_library(ivpico_helm helm/helm.cpp helm/conversions.cpp)
+add_library(ivpico_helm helm/helm.cpp helm/conversions.cpp helm/status_strings.cpp)
 target_include_directories(ivpico_helm PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 target_link_libraries(ivpico_helm
   PUBLIC ivpico_interface

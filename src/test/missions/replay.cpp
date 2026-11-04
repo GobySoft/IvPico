@@ -50,6 +50,7 @@
 #include <vector>
 
 #include "helm/helm.h"
+#include "helm/status_strings.h"
 
 namespace fs = std::filesystem;
 using ivp::interface::HelmConfig;
@@ -318,27 +319,6 @@ std::string number(double d)
     return os.str();
 }
 
-std::string allstop_string(const Status& status)
-{
-    switch (status.allstop())
-    {
-        case ivp::interface::CLEAR: return "clear";
-        case ivp::interface::MANUAL_OVERRIDE: return "ManualOverride";
-        case ivp::interface::BEHAVIOR_ERROR: return "BehaviorError";
-        case ivp::interface::NOTHING_TO_DO: return "NothingToDo";
-        case ivp::interface::NO_GOAL_BEHAVIOR: return "NoGoalBehavior";
-        case ivp::interface::DISABLED_BY_STANDBY_HELM: return "DisabledByStandbyHelm";
-        case ivp::interface::MISSING_DECISION_VARIABLES:
-        {
-            std::string s = "MissingDecVars:";
-            for (int i = 0; i < status.missing_decision_variables_size(); ++i)
-                s += (i ? "," : "") + status.missing_decision_variables(i);
-            return s;
-        }
-        default: return "";
-    }
-}
-
 std::string behavior_event_var(ivp::interface::BehaviorEvent::Kind kind)
 {
     using ivp::interface::BehaviorEvent;
@@ -558,7 +538,7 @@ int main(int argc, char* argv[])
         const int tick = static_cast<int>(k);
         add_change(ivpico, "IVPHELM_STATE", tick, Status::State_Name(out.status.state()));
         if (out.status.allstop() != ivp::interface::ALLSTOP_UNKNOWN)
-            add_change(ivpico, "IVPHELM_ALLSTOP", tick, allstop_string(out.status));
+            add_change(ivpico, "IVPHELM_ALLSTOP", tick, ivpico::helm::allstop_string(out.status));
 
         std::string active;
         for (const auto& b : out.status.behavior())

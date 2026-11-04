@@ -21,9 +21,12 @@ find_package(openocean_messages 0.1 REQUIRED COMPONENTS cpp)
 # MOOS-IvP's helm libraries (IVP_BUILD_HELM_LIBS_ONLY)
 find_package(IVP CONFIG REQUIRED)
 
-find_package(GOBY 3.0 COMPONENTS zeromq)
+find_package(GOBY 3.0 COMPONENTS zeromq OPTIONAL_COMPONENTS moos)
 if(NOT GOBY_FOUND)
   message(STATUS "Goby3 not found: not building the Goby app")
+elseif(GOBY_moos_FOUND)
+  # goby_moos links MOOS::MOOS
+  find_package(MOOS 10 QUIET)
 endif()
 
 include(CTest)

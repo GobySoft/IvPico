@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+import "goby/moos/protobuf/moos_gateway_config.proto";
+import "goby/protobuf/option_extensions.proto";
+
+package ivpico.goby.protobuf;
+
+message MOOSGatewayConfig
+{
+    repeated string to_helm = 1 [
+        (.goby.field).description =
+            "MOOS variables given to goby_helm_ivp as Variables, such as those posted by "
+            "pMarineViewer's buttons"
+    ];
+}
+
+extend .goby.apps.moos.protobuf.GobyMOOSGatewayConfig
+{
+    optional MOOSGatewayConfig ivpico = 1100;
+}
