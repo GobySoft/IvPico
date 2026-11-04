@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks out the submodules and installs the Ubuntu packages needed to build them and IvPico.
+# Installs the Ubuntu packages needed to build IvPico.
 #
 # Usage: init.sh [--no-goby]
 #   --no-goby  don't install Goby3 (build.sh then skips the Goby app)
@@ -24,8 +24,6 @@ for arg in "$@"; do
     esac
 done
 
-git submodule update --init --recommend-shallow
-
 SUDO=""
 if [ "$(id -u)" -ne 0 ]; then
     SUDO=sudo
@@ -35,7 +33,6 @@ apt_install() {
     $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@"
 }
 
-# moos-ivp's helm libraries (IVP_BUILD_HELM_LIBS_ONLY) need only CMake and a compiler
 # xz-utils: the replay tests' recorded missions are compressed
 packages=(cmake ninja-build g++ git ca-certificates protobuf-compiler libprotobuf-dev xz-utils)
 $SUDO apt-get update
@@ -43,9 +40,9 @@ apt_install "${packages[@]}"
 
 . /etc/os-release
 
-# openocean-messages, from Open Ocean Software's continuous builds (apt.oceansoft.org) if apt
-# doesn't have it yet
-oo_policy=$(apt-cache policy libopenocean-messages-dev)
+# openocean-messages and MOOS-IvP's helm libraries (built without MOOS), from Open Ocean
+# Software's continuous builds (apt.oceansoft.org) if apt doesn't have them yet
+oo_policy=$(apt-cache policy libivp-helm-dev)
 if ! grep -q "Candidate: [^(]" <<< "${oo_policy}"; then
     apt_install curl gpg
     keyring=/usr/share/keyrings/openocean-continuous.asc
@@ -61,7 +58,7 @@ if ! grep -q "Candidate: [^(]" <<< "${oo_policy}"; then
         $SUDO tee /etc/apt/sources.list.d/openocean.sources > /dev/null
     $SUDO apt-get update
 fi
-apt_install libopenocean-messages-dev
+apt_install libopenocean-messages-dev libivp-helm-dev
 
 if ${goby}; then
     # Goby3, for src/bin/goby. If apt doesn't have it yet, add packages.gobysoft.org's

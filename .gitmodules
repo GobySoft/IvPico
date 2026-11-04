@@ -1,4 +1,0 @@
-[submodule "external/moos-ivp"]
-	path = external/moos-ivp
-	url = https://github.com/GobySoft/moos-ivp.git
-	shallow = true

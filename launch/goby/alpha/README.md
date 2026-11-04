@@ -38,9 +38,10 @@ As in MOOS-IvP's alpha, the helm parks when the survey is done (pHelmIvP's `park
 
 ## Viewing in pMarineViewer
 
-`viewer.launch` shows the vehicle in pMarineViewer as in MOOS-IvP's alpha mission, with its buttons (DEPLOY, RETURN, ...) working. Start it after `alpha.launch`:
+`viewer.launch` shows the vehicle in pMarineViewer as in MOOS-IvP's alpha mission, with its buttons (DEPLOY, RETURN, ...) working. Start it after `alpha.launch`, having fetched MOOS-IvP's background images once with `get_images.sh`:
 
 ```
+./get_images.sh
 goby_launch viewer.launch
 ```
 

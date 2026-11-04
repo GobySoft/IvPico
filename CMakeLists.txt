@@ -18,8 +18,9 @@ set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 find_package(Protobuf REQUIRED)
 find_package(openocean_messages 0.0.1 REQUIRED COMPONENTS cpp)
 
-# MOOS-IvP's helm libraries (IVP_BUILD_HELM_LIBS_ONLY)
-find_package(IVP CONFIG REQUIRED)
+# MOOS-IvP's helm libraries (IVP_BUILD_HELM_LIBS_ONLY); libivp-helm-dev installs them in a
+# prefix of their own, apart from a full MOOS-IvP
+find_package(IVP CONFIG REQUIRED HINTS /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}/ivp-helm)
 
 find_package(GOBY 3.0 COMPONENTS zeromq OPTIONAL_COMPONENTS moos)
 if(NOT GOBY_FOUND)

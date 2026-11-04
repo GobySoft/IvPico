@@ -1,30 +1,11 @@
 #!/usr/bin/env bash
-# Builds MOOS-IvP's helm libraries from their submodule, then IvPico against them, all in BUILD_DIR
-# (default build), and installs both into BUILD_DIR/usr (e.g. add build/usr/bin to PATH).
-# Arguments are passed on to IvPico's cmake.
+# Builds IvPico in BUILD_DIR (default build) and installs it into BUILD_DIR/usr (e.g. add
+# build/usr/bin to PATH). Arguments are passed on to IvPico's cmake.
 set -euo pipefail
 
 cd "$(dirname "$0")"
-if [ -z "$(ls -A external/moos-ivp)" ]; then
-    echo "external/moos-ivp is empty: run ./init.sh first" >&2
-    exit 1
-fi
 BUILD_DIR=$(realpath -m "${BUILD_DIR:-build}")
-IVP_BUILD_DIR=${BUILD_DIR}/external/moos-ivp
-PREFIX=${BUILD_DIR}/usr
 
-cmake -S external/moos-ivp/ivp/src -B "${IVP_BUILD_DIR}" -G Ninja \
-    -DIVP_BUILD_HELM_LIBS_ONLY=ON -DBUILD_SHARED_LIBS=ON \
-    -DIVP_LIB_DIRECTORY="${IVP_BUILD_DIR}/lib" \
-    -DIVP_INC_DIRECTORY="${IVP_BUILD_DIR}/include" \
-    -DIVP_BIN_DIRECTORY="${IVP_BUILD_DIR}/bin"
-ninja -C "${IVP_BUILD_DIR}"
-# find_package(IVP) only works from an installation
-cmake --install "${IVP_BUILD_DIR}" --prefix "${PREFIX}" > /dev/null
-
-cmake -S . -B "${BUILD_DIR}" -G Ninja \
-    -DIVP_DIR="${PREFIX}/lib/cmake/IVP" \
-    -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
-    "$@"
+cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_INSTALL_PREFIX="${BUILD_DIR}/usr" "$@"
 ninja -C "${BUILD_DIR}"
 cmake --install "${BUILD_DIR}" > /dev/null
