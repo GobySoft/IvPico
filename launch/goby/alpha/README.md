@@ -27,7 +27,7 @@ goby_launch alpha.launch
 ./deploy.sh
 ```
 
-`deploy.sh` publishes DEPLOY=true and lifts the manual override with `goby zeromq publish`, which can publish any other `Variable` or `Command` the same way, with `GOBY_TOOL_LOAD_SHARED_LIBRARY` set to IvPico's `build/usr/lib/libivpico_interface.so`.
+`deploy.sh` publishes DEPLOY=true and lifts the manual override with `goby zeromq publish`, which can publish any other `Variable` or `Command` the same way, given IvPico's `build/usr/lib/libivpico_interface.so` with `-l`.
 
 As in MOOS-IvP's alpha, the vehicle surveys, returns, and stops at the return point; deploy again to repeat.
 
