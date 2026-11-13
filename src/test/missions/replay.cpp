@@ -20,9 +20,11 @@
 //
 // What's compared, as sequences of changes, each change matched within
 // `tolerance` iterations, and all but `max_mismatch` of them matching (a
-// stream with fewer than 20 changes has to match exactly). Continuous values
-// (distances, ETAs, track points) differ now and then, when pHelmIvP got a
-// navigation update a little later or earlier than its timestamp says.
+// stream with fewer than 20 changes has to match exactly). A change with the
+// same text on the same iteration but different numbers counts separately,
+// against `max_numeric_mismatch`: continuous values (distances, ETAs, track
+// points) differ now and then, when pHelmIvP got a navigation update a little
+// later or earlier than its timestamp says.
 //  - IVPHELM_STATE and IVPHELM_ALLSTOP against Status;
 //  - mode variables against MODE postings;
 //  - initialize posts against INITIALIZE postings;
@@ -40,7 +42,10 @@
 //  - with --alerts, those posts are left out, and the helm raises alerts
 //    itself from the .moos file's pContactMgrV20 block. Its posts are compared
 //    with pContactMgrV20's, and every change may be `alerts_tolerance`
-//    iterations off, since pContactMgrV20 iterates on its own clock.
+//    iterations off, since pContactMgrV20 iterates on its own clock. A
+//    behavior spawned an iteration later posts every value an iteration
+//    later, so only the helm state, allstops, modes, life events, active
+//    behaviors and the contact manager's posts are compared.
 //
 // Prints a summary per stream, the first mismatches in each, and exits non-zero
 // if any stream failed.
@@ -74,6 +79,7 @@ constexpr int alerts_tolerance = 2;
 constexpr double mail_latency = 0.005;
 constexpr double number_tolerance = 1e-3;
 constexpr double max_mismatch = 0.05;
+constexpr double max_numeric_mismatch = 0.2;
 constexpr double desired_max_mismatch = 0.01;
 constexpr int desired_max_run = 3;
 constexpr int report_mismatches = 5;
@@ -452,7 +458,13 @@ std::string life_event(const std::string& spec)
 bool compare(const std::string& stream, const std::vector<Change>& moos,
              const std::vector<Change>& ivpico)
 {
+    // a change within number_tolerance of the value before it is one helm
+    // seeing a difference the other didn't, from rounding
+    auto insignificant = [](const std::vector<Change>& changes, size_t k)
+    { return k > 0 && same_value(changes[k - 1].value, changes[k].value); };
+
     std::vector<std::string> problems;
+    size_t numeric = 0;
     size_t i = 0, j = 0;
     while (i < moos.size() && j < ivpico.size())
     {
@@ -462,6 +474,21 @@ bool compare(const std::string& stream, const std::vector<Change>& moos,
             ++i, ++j;
             continue;
         }
+        if (insignificant(moos, i))
+        {
+            ++i;
+            continue;
+        }
+        if (insignificant(ivpico, j))
+        {
+            ++j;
+            continue;
+        }
+        const auto moos_parts = split_numbers(moos[i].value);
+        const auto ivpico_parts = split_numbers(ivpico[j].value);
+        if (moos[i].tick == ivpico[j].tick && moos_parts.first == ivpico_parts.first &&
+            moos_parts.second.size() == ivpico_parts.second.size())
+            ++numeric;
         problems.push_back("pHelmIvP iteration " + std::to_string(moos[i].tick) + ": \"" +
                            moos[i].value + "\", IvPico iteration " +
                            std::to_string(ivpico[j].tick) + ": \"" + ivpico[j].value + "\"");
@@ -475,15 +502,22 @@ bool compare(const std::string& stream, const std::vector<Change>& moos,
             ++j;
     }
     for (; i < moos.size(); ++i)
-        problems.push_back("pHelmIvP iteration " + std::to_string(moos[i].tick) + ": \"" +
-                           moos[i].value + "\", missing from IvPico");
+        if (!insignificant(moos, i))
+            problems.push_back("pHelmIvP iteration " + std::to_string(moos[i].tick) + ": \"" +
+                               moos[i].value + "\", missing from IvPico");
     for (; j < ivpico.size(); ++j)
-        problems.push_back("IvPico iteration " + std::to_string(ivpico[j].tick) + ": \"" +
-                           ivpico[j].value + "\", missing from pHelmIvP");
+        if (!insignificant(ivpico, j))
+            problems.push_back("IvPico iteration " + std::to_string(ivpico[j].tick) + ": \"" +
+                               ivpico[j].value + "\", missing from pHelmIvP");
 
-    const bool ok = problems.size() <= max_mismatch * std::max(moos.size(), ivpico.size());
+    const size_t changes = std::max(moos.size(), ivpico.size());
+    const bool ok = problems.size() - numeric <= max_mismatch * changes &&
+                    numeric <= max_numeric_mismatch * changes;
     std::cout << (ok ? "  ok    " : "  FAIL  ") << stream << " (" << moos.size() << " changes, "
-              << problems.size() << " off)\n";
+              << problems.size() << " off";
+    if (numeric)
+        std::cout << ", " << numeric << " only in numbers";
+    std::cout << ")\n";
     for (size_t k = 0; k < problems.size() && k < report_mismatches; ++k)
         std::cout << "          " << problems[k] << "\n";
     if (problems.size() > report_mismatches)
@@ -580,6 +614,19 @@ int main(int argc, char* argv[])
                                1);
     };
 
+    // How many contact reports pHelmIvP's ledger had taken in by each
+    // iteration, from its IVPHELM_LEDGER_SUMMARY ("now:1, reps:748, ...").
+    // Relayed reports reach pHelmIvP too unevenly to place by their log times.
+    std::vector<std::optional<size_t>> reports_by_tick(ticks.size());
+    for (const auto& e : alog.entries)
+    {
+        const auto reps = e.value.find("reps:");
+        if (is_helm(e) && e.var == "IVPHELM_LEDGER_SUMMARY" && reps != std::string::npos)
+            reports_by_tick[tick_of(e.time)] = std::stoul(e.value.substr(reps + 5));
+    }
+    auto is_report = [](const Entry& e)
+    { return e.var == "NODE_REPORT" || e.var == "AIS_REPORT" || e.var == "AIS_REPORT_LOCAL"; };
+
     std::map<std::string, bool> registered;
     for (const auto& e : alog.entries)
         if (is_helm(e) && e.var == "IVPHELM_REGISTER")
@@ -624,7 +671,24 @@ int main(int argc, char* argv[])
 
     Streams ivpico;
     std::map<std::string, std::map<int, double>> ivpico_desired;
-    size_t next_input = 0;
+    auto input = [&](const Entry& e)
+    {
+        ivp::interface::Variable v;
+        v.set_time(static_cast<int64_t>((alog.logstart + e.time) * 1e6));
+        v.set_key(e.var);
+        double d;
+        if (is_number(e.value, &d))
+            v.set_dval(d);
+        else
+            v.set_sval(e.value);
+        helm.handle(v);
+    };
+    std::vector<const Entry*> reports;
+    for (const auto& e : alog.entries)
+        if (!is_helm(e) && is_report(e))
+            reports.push_back(&e);
+
+    size_t next_input = 0, next_report = 0;
     for (size_t k = 0; k < ticks.size(); ++k)
     {
         for (; next_input < alog.entries.size() &&
@@ -632,18 +696,15 @@ int main(int argc, char* argv[])
              ++next_input)
         {
             const Entry& e = alog.entries[next_input];
-            if (is_helm(e) || (alerts && is_contact_manager(e.source)))
+            if (is_helm(e) || (alerts && is_contact_manager(e.source)) || is_report(e))
                 continue;
-            ivp::interface::Variable v;
-            v.set_time(static_cast<int64_t>((alog.logstart + e.time) * 1e6));
-            v.set_key(e.var);
-            double d;
-            if (is_number(e.value, &d))
-                v.set_dval(d);
-            else
-                v.set_sval(e.value);
-            helm.handle(v);
+            input(e);
         }
+        for (; next_report < reports.size() &&
+               (reports_by_tick[k] ? next_report < *reports_by_tick[k]
+                                   : reports[next_report]->time <= ticks[k] - mail_latency);
+             ++next_report)
+            input(*reports[next_report]);
 
         const Output& out = helm.iterate(alog.logstart + ticks[k]);
         const int tick = static_cast<int>(k);
@@ -716,7 +777,15 @@ int main(int argc, char* argv[])
     std::map<std::string, bool> names;
     for (const auto& [name, changes] : moos) names[name] = true;
     for (const auto& [name, changes] : ivpico) names[name] = true;
-    for (const auto& [name, unused] : names) ok = compare(name, moos[name], ivpico[name]) && ok;
+    auto structural = [](const std::string& name)
+    {
+        return name == "IVPHELM_STATE" || name == "IVPHELM_ALLSTOP" ||
+               name == "IVPHELM_LIFE_EVENT" || name == "IVPHELM_BHV_ACTIVE" ||
+               name.rfind("mode ", 0) == 0 || name.rfind("contact_manager ", 0) == 0;
+    };
+    for (const auto& [name, unused] : names)
+        if (!alerts || structural(name))
+            ok = compare(name, moos[name], ivpico[name]) && ok;
 
     if (!print_stream.empty())
     {
@@ -731,7 +800,7 @@ int main(int argc, char* argv[])
     std::map<std::string, bool> desired_vars;
     for (const auto& [var, values] : moos_desired) desired_vars[var] = true;
     for (const auto& [var, values] : ivpico_desired) desired_vars[var] = true;
-    for (const auto& [var, unused] : desired_vars)
+    for (const auto& [var, unused] : alerts ? decltype(desired_vars)() : desired_vars)
     {
         double step = 0;
         bool wrap = false;
