@@ -25,8 +25,10 @@ One way to think of this project is as a generator for the equivalent of the MOO
 
 `init.sh` installs the Ubuntu packages needed to build IvPico:
 
-- [openocean-messages](https://github.com/openocean-software/openocean-messages), for the `Navigation` and `ControlSetpoint` messages, and MOOS-IvP's helm libraries built without MOOS ([GobySoft's `ivp-without-moos`](https://github.com/GobySoft/moos-ivp/tree/ivp-without-moos)), for the IvP solver and behaviors. Both come from [Open Ocean Software](https://github.com/openocean-software/openocean-build)'s continuous builds (apt.oceansoft.org), added if apt doesn't already have them.
-- Goby3, for the Goby app, adding [packages.gobysoft.org](http://packages.gobysoft.org)'s continuous builds if apt doesn't already have it. `init.sh --no-goby` leaves Goby3 out, and `build.sh` then skips the Goby app.
+- [openocean-messages](https://github.com/openocean-software/openocean-messages), for the `Navigation` and `ControlSetpoint` messages, and MOOS-IvP's helm libraries built without MOOS ([GobySoft's `ivp-without-moos`](https://github.com/GobySoft/moos-ivp/tree/ivp-without-moos)), for the IvP solver and behaviors.
+- Goby3, for the Goby app. `init.sh --no-goby` leaves Goby3 out, and `build.sh` then skips the Goby app.
+
+All of these come from [Open Ocean Software](https://github.com/openocean-software/openocean-build)'s continuous builds, with its releases for what they depend on (DCCL, MOOS, ...), at apt.oceansoft.org. `init.sh` adds both if apt can't install the packages already.
 
 `build.sh` then builds IvPico in `build/` and installs it into `build/usr`.
 
@@ -38,6 +40,15 @@ ctest --test-dir build
 
 `build.sh` passes any arguments on to IvPico's CMake, and `BUILD_DIR` overrides the build directory. Add `build/usr/bin` to your `PATH` to run the installed apps.
 
+## Helm library
+
+*Outline, to be written:*
+
+- `ivpico::helm::Helm`: construct from a `HelmConfig`, `handle()` the inputs, `iterate()` at the helm's rate.
+- Each iteration's `Output` (solution, status, postings, behavior events, visualizations, offboard messages, life events, objective functions, configuration) and its pHelmIvP equivalent.
+- Field levels (CORE, ADVANCED, DEVELOPER) and what each adds to `Status` and `HelmConfig`.
+- Differences from pHelmIvP: the MOOSDB echo, rejournal, standby helm.
+
 ## Goby app
 
 *This section was written by Claude.*
@@ -46,7 +57,7 @@ ctest --test-dir build
 
 Contacts come in as `Navigation` with `self: false`, or as `NODE_REPORT` variables. The helm raises pContactMgrV20's alerts itself (configured in `helm.contact_manager`), so contact behaviors such as collision avoidance spawn without a separate contact manager.
 
-`launch/goby/alpha` runs the alpha mission against Goby's basic frontseat simulator, with OpenCPN as a chart display: see its [README](launch/goby/alpha/README.md).
+`launch/goby/alpha` runs the alpha mission against Goby's basic frontseat simulator, shown on Liaison's map: see its [README](launch/goby/alpha/README.md).
 
 
 ## License

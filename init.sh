@@ -40,45 +40,42 @@ apt_install "${packages[@]}"
 
 . /etc/os-release
 
-# openocean-messages and MOOS-IvP's helm libraries (built without MOOS), from Open Ocean
-# Software's continuous builds (apt.oceansoft.org) if apt doesn't have them yet
-oo_policy=$(apt-cache policy libivp-helm-dev)
-if ! grep -q "Candidate: [^(]" <<< "${oo_policy}"; then
-    apt_install curl gpg
-    keyring=/usr/share/keyrings/openocean-continuous.asc
-    fingerprint=DAF08DD7788E6C84C6F8E8D3E59E1A81FECDB228
-    key=$(curl -fsSL https://raw.githubusercontent.com/openocean-software/openocean-build/main/keys/continuous.asc)
+packages=(libopenocean-messages-dev libivp-helm-dev)
+if ${goby}; then
+    # libgoby3-dev only recommends libais-dev and dccl5-compiler, but goby's CMake package
+    # links libais.so, and goby_add_app() runs protoc-gen-dccl. goby3-gui has goby_liaison,
+    # for the Goby launches' map
+    packages+=(libgoby3-dev goby3-apps goby3-gui libais-dev dccl5-compiler libgoby3-moos-dev)
+fi
+
+# Adds an apt.oceansoft.org channel to openocean_sources, checking its key's fingerprint
+openocean_sources=""
+add_openocean() {
+    local channel=$1 fingerprint=$2 key
+    local keyring=/usr/share/keyrings/openocean-${channel}.asc
+    key=$(curl -fsSL "https://raw.githubusercontent.com/openocean-software/openocean-build/main/keys/${channel}.asc")
     if ! gpg --show-keys --with-colons <<< "${key}" | grep -q "^fpr:*${fingerprint}:"; then
-        echo "The Open Ocean Software continuous key's fingerprint isn't ${fingerprint}" >&2
+        echo "The Open Ocean Software ${channel} key's fingerprint isn't ${fingerprint}" >&2
         exit 1
     fi
     $SUDO tee "${keyring}" <<< "${key}" > /dev/null
-    printf "Types: deb\nURIs: https://apt.oceansoft.org/continuous/%s-%s\nSuites: %s\nComponents: main\nSigned-By: %s\n" \
-        "${ID}" "${VERSION_CODENAME}" "${VERSION_CODENAME}" "${keyring}" |
-        $SUDO tee /etc/apt/sources.list.d/openocean.sources > /dev/null
+    openocean_sources+="Types: deb
+URIs: https://apt.oceansoft.org/${channel}/${ID}-${VERSION_CODENAME}
+Suites: ${VERSION_CODENAME}
+Components: main
+Signed-By: ${keyring}
+
+"
+}
+
+# If apt can't install them yet, add Open Ocean Software's continuous builds (for
+# openocean-messages, MOOS-IvP's helm libraries built without MOOS, and Goby3 with
+# 'goby test') and its releases, which have what those depend on (DCCL, MOOS, ...)
+if ! apt-get -s install "${packages[@]}" > /dev/null 2>&1; then
+    apt_install curl gpg
+    add_openocean continuous DAF08DD7788E6C84C6F8E8D3E59E1A81FECDB228
+    add_openocean release EAD278F6A25644C2C559DBB6D28A2EAB14D2A9E5
+    $SUDO tee /etc/apt/sources.list.d/openocean.sources <<< "${openocean_sources}" > /dev/null
     $SUDO apt-get update
 fi
-apt_install libopenocean-messages-dev libivp-helm-dev
-
-if ${goby}; then
-    # Goby3, for src/bin/goby. If apt doesn't have it yet, add packages.gobysoft.org's
-    # continuous builds, which have 'goby test' (newer than 3.6.1)
-    goby_policy=$(apt-cache policy libgoby3-dev)
-    if ! grep -q "Candidate: [^(]" <<< "${goby_policy}"; then
-        apt_install curl gpg
-        keyring=/usr/share/keyrings/gobysoft-archive-keyring.gpg
-        if [ ! -f "${keyring}" ]; then
-            curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x19478082E2F8D3FE" |
-                gpg --dearmor | $SUDO tee "${keyring}" > /dev/null
-        fi
-        echo "deb [signed-by=${keyring}] http://packages.gobysoft.org/${ID}/continuous/ ${VERSION_CODENAME}/" |
-            $SUDO tee /etc/apt/sources.list.d/gobysoft_continuous.list > /dev/null
-        $SUDO apt-get update
-    fi
-    # libgoby3-dev only recommends these, but goby's CMake package links libais.so,
-    # and goby_add_app() runs protoc-gen-dccl
-    apt_install libgoby3-dev goby3-apps libais-dev dccl5-compiler
-    # pMarineViewer for the Goby launches (viewer.launch), through goby_moos_gateway;
-    # MOOS-IvP's apps need libmoos-ivp but don't depend on it
-    apt_install libgoby3-moos-dev goby3-moos moosdb10 moos-ivp-apps moos-ivp-gui libmoos-ivp
-fi
+apt_install "${packages[@]}"

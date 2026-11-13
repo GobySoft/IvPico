@@ -26,13 +26,16 @@
 //
 // Prints one line per failed check and exits non-zero if there were any.
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <string>
 
+#include "helm/conversions.h"
 #include "helm/helm.h"
 
 using ivp::interface::Command;
@@ -452,6 +455,272 @@ Behavior = BHV_AvoidCollision
     check(able_filter, scenario, "no BHV_ABLE_FILTER from XYZ_DISABLE_TARGET");
 }
 
+// Behaviors' VIEW_* and NODE_MESSAGE_LOCAL posts come out typed. A waypoint
+// behavior draws its track point (VIEW_POINT) and its path (VIEW_SEGLIST), and
+// a timer's endflag posts a NODE_MESSAGE_LOCAL. Checks:
+//  - a Visualization with a point and one with a seglist of the 3 waypoints,
+//    each from waypt;
+//  - an OffboardMessage to all, with key FOO and sval "bar";
+//  - no VIEW_POINT, VIEW_SEGLIST or NODE_MESSAGE_LOCAL Posting.
+void typed_outputs()
+{
+    const std::string scenario = "typed_outputs";
+    auto cfg = config(write_bhv(scenario, R"(
+Behavior = BHV_Waypoint
+{
+  name   = waypt
+  speed  = 2
+  points = 0,40:40,40:40,0
+}
+Behavior = BHV_Timer
+{
+  name     = timer
+  duration = 2
+  endflag  = NODE_MESSAGE_LOCAL = src_node=alpha,dest_node=all,var_name=FOO,string_val=bar
+}
+)"));
+    cfg.set_start_in_drive(true);
+    Helm helm(cfg);
+    check(helm.config_warnings().empty(), scenario, "config warnings");
+
+    Vehicle vehicle;
+    double t = t0;
+    bool point = false, seglist = false, offboard = false, view_posting = false;
+    for (int i = 0; i < 40; ++i)
+    {
+        helm.handle(vehicle.navigation(t));
+        const Output& out = helm.iterate(t);
+        for (const auto& v : out.visualizations)
+        {
+            if (v.behavior() != "waypt")
+                continue;
+            point = point || v.has_point();
+            seglist = seglist || (v.has_seglist() && v.seglist().vertex_size() == 3);
+        }
+        for (const auto& m : out.offboard_messages)
+            offboard = offboard ||
+                       (m.destination_node() == "all" && m.key() == "FOO" && m.sval() == "bar");
+        for (const auto& p : out.postings)
+            view_posting = view_posting || p.key() == "VIEW_POINT" || p.key() == "VIEW_SEGLIST" ||
+                           p.key() == "NODE_MESSAGE_LOCAL";
+        if (out.solution)
+            vehicle.follow(*out.solution);
+        t += dt;
+    }
+    check(point, scenario, "no point Visualization from waypt");
+    check(seglist, scenario, "no seglist Visualization of the 3 waypoints");
+    check(offboard, scenario, "no OffboardMessage FOO=bar to all");
+    check(!view_posting, scenario, "a VIEW_* or NODE_MESSAGE_LOCAL Posting");
+}
+
+// The Configuration output: on the first iteration, with the course and speed
+// domains, and the subscriptions (e.g. MOOS_MANUAL_OVERRIDE); then only when
+// something changes. The spawn template's updates variable (SPAWN_CH) is a
+// subscription too.
+void configuration()
+{
+    const std::string scenario = "configuration";
+    auto cfg = config(write_bhv(scenario, R"(
+Behavior = BHV_ConstantHeading
+{
+  name       = ch_
+  templating = spawn
+  updates    = SPAWN_CH
+  duration   = no-time-limit
+  heading    = 0
+}
+)"));
+    Helm helm(cfg);
+    Vehicle vehicle;
+    double t = t0;
+    int count = 0;
+    std::optional<ivp::interface::Configuration> first;
+    for (int i = 0; i < 10; ++i)
+    {
+        helm.handle(vehicle.navigation(t));
+        const Output& out = helm.iterate(t);
+        if (out.configuration)
+        {
+            ++count;
+            if (!first)
+                first = *out.configuration;
+        }
+        t += dt;
+    }
+    check(first.has_value(), scenario, "no Configuration");
+    if (!first)
+        return;
+    check(count == 1, scenario, std::to_string(count) + " Configurations, unchanged");
+    check(first->domain_size() == 2 && first->domain(0).name() == "course" &&
+              first->domain(0).points() == 360,
+          scenario, "domains: " + first->ShortDebugString());
+    auto subscribed = [&](const std::string& var)
+    {
+        return std::find(first->subscription().begin(), first->subscription().end(), var) !=
+               first->subscription().end();
+    };
+    check(subscribed("MOOS_MANUAL_OVERRIDE"), scenario, "not subscribed to MOOS_MANUAL_OVERRIDE");
+    check(subscribed("SPAWN_CH"), scenario, "not subscribed to SPAWN_CH");
+}
+
+// RESTART_HELM rebuilds the behaviors from the same files, read again.
+// The behavior file asks for course 90; it's rewritten to ask for 180, and:
+//  - with RESTART_HELM = type1, the course becomes 180, and the "initialize"
+//    variable isn't posted again;
+//  - with Command.restart REBUILD_AND_REINITIALIZE (type2), it is.
+void restart(bool reinitialize)
+{
+    const std::string scenario =
+        std::string("restart (") + (reinitialize ? "type2" : "type1") + ")";
+    const std::string name = std::string("restart_") + (reinitialize ? "2" : "1");
+    auto bhv = [](int heading)
+    {
+        return "initialize FOO = 1\nBehavior = BHV_ConstantHeading\n{\n  name = ch\n  heading = " +
+               std::to_string(heading) + "\n  duration = no-time-limit\n}\n";
+    };
+    auto cfg = config(write_bhv(name, bhv(90)));
+    cfg.mutable_domain(1)->set_optional(true);
+    cfg.set_start_in_drive(true);
+    Helm helm(cfg);
+
+    Vehicle vehicle;
+    double t = t0;
+    bool course_90 = false, course_180 = false;
+    int initializes = 0;
+    for (int i = 0; i < 30; ++i)
+    {
+        helm.handle(vehicle.navigation(t));
+        if (i == 10)
+        {
+            write_bhv(name, bhv(180));
+            if (reinitialize)
+            {
+                Command c;
+                c.mutable_restart()->set_type(Command::Restart::REBUILD_AND_REINITIALIZE);
+                helm.handle(c);
+            }
+            else
+                helm.handle(variable("RESTART_HELM", "type1"));
+        }
+        const Output& out = helm.iterate(t);
+        for (const auto& p : out.postings)
+            if (p.origin() == Posting::INITIALIZE && p.key() == "FOO")
+                ++initializes;
+        if (out.solution && out.solution->allstop() == ivp::interface::CLEAR)
+        {
+            const double course = desired_course(*out.solution);
+            if (i < 10 && std::fabs(course - 90) < 1)
+                course_90 = true;
+            if (i > 10 && std::fabs(course - 180) < 1)
+                course_180 = true;
+        }
+        t += dt;
+    }
+    check(course_90, scenario, "never course 90 before the restart");
+    check(course_180, scenario, "never course 180 after the restart");
+    check(initializes == (reinitialize ? 2 : 1), scenario,
+          "FOO initialized " + std::to_string(initializes) + " times");
+}
+
+// Inputs more than ok_skew (here 10 s) from the helm's clock are ignored, with
+// a warning; others go in. DEPLOY is set with a timestamp 30 s old, then with
+// a current one: only the second turns MODE to ACTIVE.
+void ok_skew()
+{
+    const std::string scenario = "ok_skew";
+    auto cfg = config(write_bhv(scenario, R"(
+initialize DEPLOY = false
+set MODE = ACTIVE {
+  DEPLOY = true
+} INACTIVE
+Behavior = BHV_ConstantHeading
+{
+  name     = ch
+  heading  = 90
+  duration = no-time-limit
+}
+)"));
+    cfg.mutable_domain(1)->set_optional(true);
+    cfg.set_start_in_drive(true);
+    cfg.set_ok_skew(10);
+    Helm helm(cfg);
+
+    Vehicle vehicle;
+    double t = t0;
+    bool warned = false, active_early = false, active = false;
+    for (int i = 0; i < 30; ++i)
+    {
+        helm.handle(vehicle.navigation(t));
+        Variable deploy = variable("DEPLOY", "true");
+        if (i == 10)
+        {
+            deploy.set_time(static_cast<int64_t>((t - 30) * 1e6));
+            helm.handle(deploy);
+        }
+        if (i == 20)
+        {
+            deploy.set_time(static_cast<int64_t>(t * 1e6));
+            helm.handle(deploy);
+        }
+        const Output& out = helm.iterate(t);
+        for (const auto& e : out.behavior_events)
+            warned = warned || e.text().find("Helm ignores DEPLOY due to skew") == 0;
+        if (mode(out) == "ACTIVE")
+        {
+            if (i < 20)
+                active_early = true;
+            active = true;
+        }
+        t += dt;
+    }
+    check(warned, scenario, "no skew warning for the old DEPLOY");
+    check(!active_early, scenario, "acted on the old DEPLOY");
+    check(active, scenario, "never ACTIVE after the current DEPLOY");
+}
+
+// The VIEW_* and NODE_MESSAGE_LOCAL conversions go both ways: each spec, as
+// pHelmIvP's behaviors post them, parses to a Visualization (or
+// OffboardMessage) that converts back to a spec parsing to the same message.
+void conversion_round_trip()
+{
+    const std::string scenario = "conversion_round_trip";
+    using ivpico::helm::visualization;
+    for (const auto& [var, spec] : std::vector<std::pair<std::string, std::string>>{
+             {"VIEW_POINT", "x=22.77,y=-27.59,label=alpha's trackpt,label_color=yellow,"
+                            "vertex_color=yellow,vertex_size=4"},
+             {"VIEW_SEGLIST", "pts={23.8,-80.1:103.2,-70.1},label=abe_avdcol_ben,"
+                              "label_color=white,edge_color=white,duration=100"},
+             {"VIEW_SEGLIST", "pts={0,0:9,0:0,9},label=abe_avdcol_ben,active=false"},
+             {"VIEW_POLYGON", "pts={0,-55:14.1,-60.9:20,-75:14.1,-89.1:0,-95},label=abe_LOITER,"
+                              "edge_color=orange,vertex_color=white,edge_size=1"},
+             {"VIEW_SEGLR", "pts={151.6,-113.7:151.6,-113.6},ray=11,label=ben_seglr,"
+                            "vertex_color=lime_green,vertex_size=2,ray_len=20,head_size=1"}})
+    {
+        const auto first = visualization(var, spec);
+        check(first.has_value(), scenario, "doesn't parse: " + spec);
+        if (!first)
+            continue;
+        const auto [back_var, back_spec] = ivpico::helm::view_posting(*first);
+        const auto second = visualization(back_var, back_spec);
+        check(back_var == var && second && second->ShortDebugString() == first->ShortDebugString(),
+              scenario, spec + " came back as " + back_var + " " + back_spec);
+    }
+
+    const std::string msg_spec =
+        "src_node=henry,dest_node=gilda,var_name=MOVE_ON,string_val=true,src_app=pHelmIvP,"
+        "src_bhv=ping";
+    const auto msg = ivpico::helm::offboard_message(msg_spec);
+    check(msg && msg->key() == "MOVE_ON" && msg->sval() == "true" &&
+              msg->destination_node() == "gilda" && msg->source_behavior() == "ping",
+          scenario, "NODE_MESSAGE_LOCAL: " + (msg ? msg->ShortDebugString() : "no parse"));
+    if (msg)
+    {
+        const auto again = ivpico::helm::offboard_message(ivpico::helm::node_message_spec(*msg));
+        check(again && again->ShortDebugString() == msg->ShortDebugString(), scenario,
+              "NODE_MESSAGE_LOCAL came back as " + ivpico::helm::node_message_spec(*msg));
+    }
+}
+
 // Allstop reasons and park-on-allstop:
 //  - no speed decision with a required speed domain gives
 //    MISSING_DECISION_VARIABLES. pHelmIvP gives a missing decision an
@@ -476,7 +745,9 @@ Behavior = BHV_ConstantHeading
         Helm helm(cfg);
         Vehicle vehicle;
         double t = t0;
-        bool missing = false, solution = false;
+        // After one iteration's grace, every iteration of the allstop has a zero solution
+        bool missing = false, clear = false, held = false;
+        int missing_iterations = 0;
         for (int i = 0; i < 12; ++i)
         {
             helm.handle(vehicle.navigation(t));
@@ -484,13 +755,21 @@ Behavior = BHV_ConstantHeading
             if (out.status.allstop() == ivp::interface::MISSING_DECISION_VARIABLES &&
                 out.status.missing_decision_variables_size() == 1 &&
                 out.status.missing_decision_variables(0) == "speed")
+            {
                 missing = true;
-            if (out.solution)
-                solution = true;
+                if (++missing_iterations > 1 &&
+                    !(out.solution &&
+                      out.solution->allstop() == ivp::interface::MISSING_DECISION_VARIABLES &&
+                      out.solution->desired().speed().value() == 0))
+                    held = true;
+            }
+            if (out.solution && out.solution->allstop() == ivp::interface::CLEAR)
+                clear = true;
             t += dt;
         }
         check(missing, scenario, "no MISSING_DECISION_VARIABLES for speed");
-        check(!solution, scenario, "a solution without a speed decision");
+        check(!clear, scenario, "a CLEAR solution without a speed decision");
+        check(!held, scenario, "an iteration of the allstop without a zero solution");
         check(helm.state() == Status::DRIVE, scenario, "parked on a missing decision");
     }
     {
@@ -517,6 +796,63 @@ Behavior = BHV_ConstantHeading
         check(clear, scenario, "no CLEAR solution with speed optional");
         check(overridden, scenario, "manual override didn't PARK with MANUAL_OVERRIDE");
     }
+}
+
+// The mission ends as alpha's does: the only behavior completes, leaving
+// NothingToDo. pHelmIvP posts no DESIRED_* from then on, relying on pMarinePID
+// to stop on stale input; a frontseat holds its last command instead, so the
+// helm must keep commanding zero speed. After one iteration's grace, every
+// iteration should have a NOTHING_TO_DO solution with speed 0.
+void mission_end()
+{
+    const std::string scenario = "mission_end";
+    auto cfg = config(write_bhv(scenario, R"(
+Behavior = BHV_ConstantSpeed
+{
+  name     = cs
+  speed    = 2
+  duration = 2
+}
+
+Behavior = BHV_ConstantHeading
+{
+  name     = ch
+  heading  = 90
+  duration = 2
+}
+)"));
+    cfg.set_start_in_drive(true);
+    Helm helm(cfg);
+    check(helm.config_warnings().empty(), scenario, "config warnings");
+
+    Vehicle vehicle;
+    double t = t0;
+    bool moving = false;
+    int nothing_iterations = 0, stopped_iterations = 0;
+    for (int i = 0; i < 40; ++i)
+    {
+        helm.handle(vehicle.navigation(t));
+        const Output& out = helm.iterate(t);
+        if (out.solution && out.solution->allstop() == ivp::interface::CLEAR &&
+            out.solution->desired().speed().value() > 1)
+            moving = true;
+        if (out.status.allstop() == ivp::interface::NOTHING_TO_DO)
+        {
+            ++nothing_iterations;
+            if (out.solution && out.solution->allstop() == ivp::interface::NOTHING_TO_DO &&
+                out.solution->desired().speed().value() == 0)
+                ++stopped_iterations;
+        }
+        if (out.solution)
+            vehicle.follow(*out.solution);
+        t += dt;
+    }
+    check(moving, scenario, "never moved before the behaviors completed");
+    check(nothing_iterations > 10, scenario, "never NOTHING_TO_DO after the behaviors completed");
+    check(stopped_iterations == nothing_iterations - 1, scenario,
+          std::to_string(stopped_iterations) + " zero solutions in " +
+              std::to_string(nothing_iterations) + " iterations of NOTHING_TO_DO");
+    check(vehicle.speed == 0, scenario, "still moving at the end");
 }
 
 // A .bhv file with an unknown behavior parameter leaves the helm in MALCONFIG,
@@ -578,6 +914,72 @@ Behavior = BHV_ConstantHeading
     check(bar, scenario, "never posted BAR");
 }
 
+// The DEVELOPER fields of Status and the objective functions. A timer sends ch
+// a good update and then a bad one (an unknown parameter), then completes, so
+// the status should show each update's result, the completed count, and ch's
+// priority weight, pieces and update summary while it is active.
+void developer_status()
+{
+    const std::string scenario = "developer_status";
+    auto cfg = config(write_bhv(scenario, R"(
+Behavior = BHV_ConstantHeading
+{
+  name     = ch
+  pwt      = 75
+  heading  = 90
+  duration = no-time-limit
+  updates  = CH_UPDATES
+}
+
+Behavior = BHV_Timer
+{
+  name     = timer
+  duration = 2
+  endflag  = CH_UPDATES = heading=180
+  endflag  = CH_UPDATES = nonsense=1
+}
+)"));
+    cfg.mutable_domain(1)->set_optional(true);
+    cfg.set_start_in_drive(true);
+    cfg.set_report_objective_functions(true);
+    Helm helm(cfg);
+    check(helm.config_warnings().empty(), scenario, "config warnings");
+
+    Vehicle vehicle;
+    double t = t0;
+    bool ch_details = false, success = false, param_error = false, completed = false, ipf = false;
+    std::string summary;
+    for (int i = 0; i < 40; ++i)
+    {
+        helm.handle(vehicle.navigation(t));
+        const Output& out = helm.iterate(t);
+        for (const auto& b : out.status.behavior())
+            if (b.name() == "ch" && b.run_state() == Status::Behavior::ACTIVE)
+            {
+                ch_details = ch_details || (std::fabs(b.priority_weight() - 75) < 1e-6 &&
+                                            b.pieces() >= 1 && b.has_create_cpu());
+                summary = b.update_summary();
+            }
+        for (const auto& u : out.status.update_result())
+        {
+            if (u.behavior() != "ch" || u.variable() != "CH_UPDATES")
+                continue;
+            success = success || u.result() == Status::UpdateResult::SUCCESS;
+            param_error = param_error || u.result() == Status::UpdateResult::PARAM_ERROR;
+        }
+        completed = completed || out.status.completed_count() == 1;
+        for (const auto& of : out.objective_functions)
+            ipf = ipf || (of.behavior() == "ch" && !of.encoding().empty());
+        t += dt;
+    }
+    check(ch_details, scenario, "no priority weight 75, pieces and create cpu for active ch");
+    check(success, scenario, "no SUCCESS update result for heading=180");
+    check(param_error, scenario, "no PARAM_ERROR update result for nonsense=1");
+    check(completed, scenario, "completed_count never 1 after the timer completed");
+    check(summary != "0/0", scenario, "ch's update summary never counted the updates");
+    check(ipf, scenario, "no objective function from ch");
+}
+
 } // namespace
 
 int main()
@@ -588,8 +990,16 @@ int main()
     spawn();
     contact_alert(true);
     contact_alert(false);
+    typed_outputs();
+    conversion_round_trip();
+    configuration();
+    restart(false);
+    restart(true);
+    ok_skew();
     allstop();
+    mission_end();
     malconfig();
     deferred_initialize();
+    developer_status();
     return errors == 0 ? 0 : 1;
 }

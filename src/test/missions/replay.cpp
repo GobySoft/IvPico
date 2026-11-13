@@ -45,7 +45,9 @@
 //  - IVPHELM_STATE and IVPHELM_ALLSTOP against Status;
 //  - mode variables against MODE postings;
 //  - initialize posts against INITIALIZE postings;
-//  - each behavior's posts against its postings and behavior events;
+//  - each behavior's posts against its postings and behavior events, with
+//    VIEW_POINT, VIEW_SEGLIST, VIEW_POLYGON, VIEW_SEGLR and NODE_MESSAGE_LOCAL
+//    parsed on both sides (against Visualization and OffboardMessage);
 //  - IVPHELM_LIFE_EVENT against life events;
 //  - IVPHELM_BHV_ACTIVE against the ACTIVE behaviors in Status.
 // DESIRED_* are compared iteration by iteration: within one step of the
@@ -80,6 +82,7 @@
 #include <string>
 #include <vector>
 
+#include "helm/conversions.h"
 #include "helm/helm.h"
 #include "helm/status_strings.h"
 
@@ -184,13 +187,17 @@ bool is_contact_manager(const std::string& source)
 // pContactMgrV20's block of the .moos file
 void read_contact_manager(const std::vector<std::string>& lines, HelmConfig::ContactManager& cm)
 {
-    // in reverse, as MOOS's mission reader hands them over
+    // in reverse, as MOOS's mission reader hands them over, and without white
+    // space, since pContactMgrV20 turns off the reader's verbatim quoting
     for (auto it = lines.rbegin(); it != lines.rend(); ++it)
     {
         const std::string& line = *it;
         const auto eq = line.find('=');
         const std::string key = lower(trim(line.substr(0, eq)));
-        const std::string value = eq == std::string::npos ? "" : trim(line.substr(eq + 1));
+        std::string value = eq == std::string::npos ? "" : line.substr(eq + 1);
+        value.erase(std::remove_if(value.begin(), value.end(),
+                                   [](unsigned char c) { return std::isspace(c); }),
+                    value.end());
         const bool truth = lower(value) == "true";
         if (key == "alert")
             cm.add_alert(value);
@@ -428,6 +435,27 @@ bool same_value(const std::string& a, const std::string& b)
             std::max(0.01, number_tolerance * std::fabs(pa.second[i])))
             return false;
     return true;
+}
+
+// A Visualization or OffboardMessage without what the comparison leaves out
+std::string canonical(google::protobuf::Message& msg)
+{
+    const auto* desc = msg.GetDescriptor();
+    for (const char* field : {"time", "behavior", "iteration"})
+        if (const auto* f = desc->FindFieldByName(field))
+            msg.GetReflection()->ClearField(&msg, f);
+    return msg.ShortDebugString();
+}
+
+// A behavior's posting as the comparison sees it
+std::string parsed(const std::string& var, const std::string& value)
+{
+    if (auto vis = ivpico::helm::visualization(var, value))
+        return canonical(*vis);
+    if (var == "NODE_MESSAGE_LOCAL")
+        if (auto msg = ivpico::helm::offboard_message(value))
+            return canonical(*msg);
+    return value;
 }
 
 std::string number(double d)
@@ -681,7 +709,7 @@ int main(int argc, char* argv[])
         else if (a == "HELM_VAR_INIT")
             add_change(moos, "initialize " + e.var, k, e.value);
         else if (a.find(':') != std::string::npos && e.var != "BHV_IPF")
-            add_change(moos, a.substr(a.find(':') + 1) + " " + e.var, k, e.value);
+            add_change(moos, a.substr(a.find(':') + 1) + " " + e.var, k, parsed(e.var, e.value));
     }
 
     // IvPico's side
@@ -708,6 +736,7 @@ int main(int argc, char* argv[])
             reports.push_back(&e);
 
     size_t next_input = 0, next_report = 0;
+    auto previous_allstop = ivp::interface::ALLSTOP_UNKNOWN;
     for (size_t k = 0; k < ticks.size(); ++k)
     {
         for (; next_input < alog.entries.size() &&
@@ -727,6 +756,8 @@ int main(int argc, char* argv[])
 
         const Output& out = helm.iterate(alog.logstart + ticks[k]);
         const int tick = static_cast<int>(k);
+        const bool allstop_changed = out.status.allstop() != previous_allstop;
+        previous_allstop = out.status.allstop();
         add_change(ivpico, "IVPHELM_STATE", tick, Status::State_Name(out.status.state()));
         if (out.status.allstop() != ivp::interface::ALLSTOP_UNKNOWN)
             add_change(ivpico, "IVPHELM_ALLSTOP", tick, ivpico::helm::allstop_string(out.status));
@@ -766,12 +797,30 @@ int main(int argc, char* argv[])
             if (!e.behavior().empty())
                 add_change(ivpico, e.behavior() + " " + behavior_event_var(e.kind()), tick,
                            e.text());
+        for (auto v : out.visualizations)
+        {
+            const std::string var = v.has_point()     ? "VIEW_POINT"
+                                    : v.has_seglist() ? "VIEW_SEGLIST"
+                                    : v.has_polygon() ? "VIEW_POLYGON"
+                                                      : "VIEW_SEGLR";
+            const std::string behavior = v.behavior();
+            add_change(ivpico, behavior + " " + var, tick, canonical(v));
+        }
+        for (auto m : out.offboard_messages)
+        {
+            const std::string behavior = m.source_behavior();
+            add_change(ivpico, behavior + " NODE_MESSAGE_LOCAL", tick, canonical(m));
+        }
         for (const auto& e : out.life_events)
         {
             const std::string type = lower(ivp::interface::LifeEvent::Type_Name(e.type()));
             ivpico["IVPHELM_LIFE_EVENT"].push_back({tick, type + " " + e.behavior()});
         }
-        if (out.solution)
+        // pHelmIvP posts an allstop's zero DESIRED_* only on the iteration the allstop
+        // changes (and, after an iteration's grace, never for one with no decisions),
+        // relying on pMarinePID to stop when they go stale. The helm repeats its zero
+        // solution every iteration of an allstop, so only the change is compared.
+        if (out.solution && (out.solution->allstop() == ivp::interface::CLEAR || allstop_changed))
         {
             const auto& d = out.solution->desired();
             if (d.has_attitude() && d.attitude().has_heading())

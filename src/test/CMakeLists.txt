@@ -3,11 +3,12 @@ target_link_libraries(check_helm_libs PRIVATE IVP::helmivp IVP::ivpbuild IVP::iv
 add_test(NAME helm_libs COMMAND check_helm_libs)
 
 add_executable(test_helm helm/test_helm.cpp)
-target_link_libraries(test_helm PRIVATE ivpico_helm)
+target_link_libraries(test_helm PRIVATE ivpico_helm IVP::contacts IVP::geometry IVP::mbutil)
 add_test(NAME helm COMMAND test_helm)
 
 add_executable(replay missions/replay.cpp)
-target_link_libraries(replay PRIVATE ivpico_helm)
+# conversions.h includes MOOS-IvP headers
+target_link_libraries(replay PRIVATE ivpico_helm IVP::contacts IVP::geometry IVP::mbutil)
 file(GLOB fixtures LIST_DIRECTORIES true ${CMAKE_CURRENT_SOURCE_DIR}/missions/fixtures/*)
 foreach(fixture ${fixtures})
   if(IS_DIRECTORY ${fixture})

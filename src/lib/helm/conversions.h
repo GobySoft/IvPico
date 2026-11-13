@@ -20,6 +20,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "NodeRecord.h"
 
@@ -43,6 +44,20 @@ std::string able_filter_string(const ivp::interface::Command::AbleFilter& filter
 
 // Sets the setpoint field for the decision on a helm domain variable
 void set_desired(openocean::ControlSetpoint& desired, const std::string& domain_var, double value);
+
+// A VIEW_POINT, VIEW_SEGLIST, VIEW_POLYGON or VIEW_SEGLR posting as a
+// Visualization, or nothing for another variable or a spec that doesn't parse
+std::optional<ivp::interface::Visualization> visualization(const std::string& var,
+                                                           const std::string& spec);
+
+// A NODE_MESSAGE_LOCAL posting as an OffboardMessage, or nothing if it doesn't parse
+std::optional<ivp::interface::OffboardMessage> offboard_message(const std::string& spec);
+
+// The variable (VIEW_POINT, etc.) and spec that pHelmIvP would post for a Visualization
+std::pair<std::string, std::string> view_posting(const ivp::interface::Visualization& vis);
+
+// The NODE_MESSAGE_LOCAL spec for an OffboardMessage
+std::string node_message_spec(const ivp::interface::OffboardMessage& msg);
 
 } // namespace helm
 } // namespace ivpico

@@ -1,7 +1,0 @@
-#!/usr/bin/env goby_launch
-
-# pMarineViewer, as in MOOS-IvP's alpha mission (see README.md): start after alpha.launch
-MOOSDB alpha.moos
-pNodeReporter alpha.moos
-[env=IVP_IMAGE_DIRS=${IVP_IMAGE_DIRS:-$PWD/images}] pMarineViewer alpha.moos
-[env=GOBY_MOOS_GATEWAY_PLUGINS=${GOBY_MOOS_GATEWAY_PLUGINS:-$PWD/../../../build/usr/lib/libivpico_moos_gateway_plugin.so}] goby_moos_gateway config/moos_gateway.pb.cfg
