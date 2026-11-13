@@ -1,0 +1,2 @@
+# s1_alpha with its behaviors from the alpha launch's alpha.bhv.yml
+include: [../s1_alpha/test.yml]

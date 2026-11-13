@@ -36,3 +36,9 @@ jobs:
         run: ./build.sh
       - name: Test
         run: ctest --test-dir build --output-on-failure --no-tests=error
+      - name: Build and test without yaml-cpp
+        if: matrix.ubuntu == '24.04' && matrix.arch == 'amd64'
+        run: |
+          BUILD_DIR=build-noyaml ./build.sh -Denable_yaml=OFF
+          ctest --test-dir build-noyaml --output-on-failure --no-tests=error \
+            -R '^(helm|behavior_file|bhv_schema|closed_loop_s1_alpha_inline)$'

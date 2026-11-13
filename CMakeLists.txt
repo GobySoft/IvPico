@@ -30,6 +30,14 @@ elseif(GOBY_moos_FOUND)
   find_package(MOOS 10 QUIET)
 endif()
 
+# YAML behavior files (.bhv.yml); without it, behaviors come from .bhv files or the helm config
+find_package(yaml-cpp QUIET)
+option(enable_yaml "Read YAML behavior files (.bhv.yml)" ${yaml-cpp_FOUND})
+if(enable_yaml AND NOT yaml-cpp_FOUND)
+  message(FATAL_ERROR "enable_yaml is ON but yaml-cpp wasn't found (apt install libyaml-cpp-dev)")
+endif()
+message(STATUS "YAML behavior files (enable_yaml): ${enable_yaml}")
+
 include(CTest)
 
 add_subdirectory(src)

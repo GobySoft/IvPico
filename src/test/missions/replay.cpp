@@ -19,7 +19,8 @@
 // ivpico::helm::Helm, and checks that the helm makes the same decisions and
 // posts the same things.
 //
-// Usage: replay <fixture directory> [--alerts] [stream to print in full, e.g. "loiter LOITER_INDEX"]
+// Usage: replay <fixture directory> [--alerts] [--via-yaml]
+//               [stream to print in full, e.g. "loiter LOITER_INDEX"]
 //
 // The fixture holds the vehicle's .moos file (for pHelmIvP's configuration),
 // its .bhv files, and an alog trimmed to pHelmIvP's posts and the posts to
@@ -82,6 +83,9 @@
 #include <string>
 #include <vector>
 
+#include <unistd.h>
+
+#include "helm/behavior_file.h"
 #include "helm/conversions.h"
 #include "helm/helm.h"
 #include "helm/status_strings.h"
@@ -612,18 +616,66 @@ bool compare_desired(const std::string& var, double step, bool wrap,
     return ok;
 }
 
+// --via-yaml: the same behaviors, loaded from .bhv.yml files converted from
+// the fixture's .bhv files. pHelmIvP reads its .bhv files in name order, and
+// the helm reads YAML files in the order given, so they're given sorted.
+bool convert_to_yaml(HelmConfig& cfg)
+{
+#ifdef HAS_YAML
+    std::vector<std::string> files(cfg.behavior_file().begin(), cfg.behavior_file().end());
+    std::sort(files.begin(), files.end());
+    cfg.clear_behavior_file();
+    const fs::path out_dir =
+        fs::temp_directory_path() / ("ivpico_replay_" + std::to_string(getpid()));
+    fs::create_directories(out_dir);
+    // kept until exit, since a restart reads the behaviors again
+    static const struct RemoveOnExit
+    {
+        fs::path dir;
+        ~RemoveOnExit() { fs::remove_all(dir); }
+    } remove_on_exit{out_dir};
+    for (const auto& file : files)
+    {
+        std::ifstream in(file);
+        std::stringstream text;
+        text << in.rdbuf();
+        std::vector<std::string> errors;
+        const auto set = ivpico::helm::read_bhv(text.str(), file, errors);
+        for (const auto& e : errors) std::cerr << e << "\n";
+        if (!errors.empty())
+            return false;
+        const fs::path yaml = out_dir / (fs::path(file).filename().string() + ".yml");
+        std::ofstream(yaml) << ivpico::helm::yaml_text(set);
+        cfg.add_behavior_file(yaml.string());
+        std::cout << "  behaviors from " << yaml.string() << "\n";
+    }
+    return true;
+#else
+    (void)cfg;
+    std::cerr << "--via-yaml needs IvPico built with yaml-cpp (enable_yaml)\n";
+    return false;
+#endif
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
 {
     std::vector<std::string> args(argv + 1, argv + argc);
-    const auto alerts_arg = std::find(args.begin(), args.end(), "--alerts");
-    const bool alerts = alerts_arg != args.end();
-    if (alerts)
-        args.erase(alerts_arg);
+    auto take_flag = [&](const std::string& flag)
+    {
+        const auto it = std::find(args.begin(), args.end(), flag);
+        if (it == args.end())
+            return false;
+        args.erase(it);
+        return true;
+    };
+    const bool alerts = take_flag("--alerts");
+    const bool via_yaml = take_flag("--via-yaml");
     if (args.size() != 1 && args.size() != 2)
     {
-        std::cerr << "usage: replay <fixture directory> [--alerts] [stream to print in full]\n";
+        std::cerr << "usage: replay <fixture directory> [--alerts] [--via-yaml] [stream to print "
+                     "in full]\n";
         return 2;
     }
     const std::string print_stream = args.size() == 2 ? args[1] : "";
@@ -644,6 +696,8 @@ int main(int argc, char* argv[])
 
     HelmConfig cfg = read_config(moos_file, dir);
     cfg.set_contact_alerts(alerts);
+    if (via_yaml && !convert_to_yaml(cfg))
+        return 2;
     const Alog alog = read_alog(alog_file);
 
     auto is_helm = [](const Entry& e) { return e.source.rfind("pHelmIvP", 0) == 0; };
