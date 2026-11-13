@@ -74,6 +74,63 @@ message HelmConfig
     // with this mode
     openocean.SpeedMode speed_mode = 110 [(ivp.field).level = ADVANCED];
 
+    // pContactMgrV20's configuration, for the alerts the helm raises itself
+    message ContactManager
+    {
+        // e.g. "id=avd, on_flag=CONTACT_INFO=name=$[VNAME] # contact=$[VNAME],
+        // alert_range=15, cpa_range=25", alongside behaviors' own requests
+        repeated string alert = 1;
+
+        // contacts the contact manager ignores altogether
+        repeated string ignore_name = 2;
+        repeated string match_name = 3;
+        repeated string ignore_group = 4;
+        repeated string match_group = 5;
+        repeated string ignore_type = 6;
+        repeated string match_type = 7;
+        // "pts={x,y:x,y:...}"
+        repeated string ignore_region = 8;
+        repeated string match_region = 9;
+        bool strict_ignore = 10;
+        string ownship_group = 11;
+        string ownship_type = 12;
+
+        // seconds; default 60
+        optional double contact_max_age = 20;
+        // meters, beyond which contacts are retired; 0 is off; default 2000
+        optional double reject_range = 21;
+        // default 500
+        optional uint32 max_contacts = 22;
+        // seconds since a contact's last report over which its extrapolation
+        // decays to a stop; default 15 to 30
+        optional double decay_start = 23;
+        optional double decay_end = 24;
+        // raise no alerts until the helm has been in DRIVE
+        bool hold_alerts_for_helm = 25;
+        // post ALERT_VERBOSE on each alert change
+        bool alert_verbose = 26;
+
+        // a post to one of these with a contact's name disables, enables or
+        // expunges the behaviors for that contact (through BHV_ABLE_FILTER)
+        string disable_var = 30;
+        string enable_var = 31;
+        string expunge_var = 32;
+        // "VAR=value" posts on any enable or disable, a disable, or an enable
+        repeated string able_flag = 33;
+        repeated string disable_flag = 34;
+        repeated string enable_flag = 35;
+
+        // seconds of warning before a contact closing on ownship reaches the
+        // largest alert range; off unless positive
+        double early_warning_time = 40;
+        // "VAR=value", expanding $[CONTACT], $[RNG], $[RNG_EXT], $[CPA], $[ROC], $[UTC]
+        repeated string early_warning_flag = 41;
+        repeated string cease_warning_flag = 42;
+        // "VAR=value" on retiring a contact, expanding $[CONTACT] and $[UTC]
+        repeated string retire_flag = 43;
+    }
+    ContactManager contact_manager = 111 [(ivp.field).level = ADVANCED];
+
     bool report_objective_functions = 200 [(ivp.field).level = DEVELOPER];
     // default true; false leaves alerts to an outside contact manager
     optional bool contact_alerts = 201 [(ivp.field).level = DEVELOPER];

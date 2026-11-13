@@ -26,6 +26,7 @@
 #include "Populator_BehaviorSet.h"
 #include "VarDataPair.h"
 
+#include "contact_manager.h"
 #include "conversions.h"
 
 using ivp::interface::AllStop;
@@ -158,6 +159,7 @@ class Helm::Impl
     void post_initial_variables(bool deferred);
     void post_helm_start_messages();
     void update_ledger_snap();
+    void run_contact_manager();
     void update_plat_model();
     void post_mode_messages();
     void post_behavior_messages();
@@ -185,6 +187,7 @@ class Helm::Impl
     InfoBuffer info_buffer_;
     LedgerSnap ledger_snap_;
     ContactLedger ledger_;
+    std::unique_ptr<ContactManager> contact_manager_;
     PlatModelGenerator pmgen_;
     std::unique_ptr<HelmEngine> engine_;
     BehaviorSet* bhv_set_{nullptr};
@@ -269,6 +272,14 @@ void Helm::Impl::configure()
     ledger_.setStaleThresh(vclip(contact_max_age, 10, 1800));
     if (cfg_.has_contact_max_count())
         ledger_.setMaxContacts(cfg_.contact_max_count());
+
+    if (!cfg_.has_contact_alerts() || cfg_.contact_alerts())
+    {
+        contact_manager_ =
+            std::make_unique<ContactManager>(cfg_.contact_manager(), ownship_, config_warnings_);
+        if (geodesy_)
+            contact_manager_->ledger().setGeodesy(geodesy_->to_local, geodesy_->to_global);
+    }
 
     const auto& pm = cfg_.platform_model();
     std::string pmgen =
@@ -365,14 +376,20 @@ const Output& Helm::Impl::iterate(double time)
     if (status_ != Status::MALCONFIG)
     {
         for (const auto& [var, value] : echo)
+        {
             if (registered_.count(var))
                 apply_variable(var, value, echo_time);
+            else if (contact_manager_)
+                contact_manager_->handle_mail(var, value.s);
+        }
         apply_pending(time);
         info_buffer_.setValue("COMMS_POLICY", comms_policy_, time);
     }
     pending_.clear();
 
     update_status();
+    if (status_ != Status::MALCONFIG)
+        run_contact_manager();
     notify("IVPHELM_STATE", Status::State_Name(status_));
     fill_status();
     if (!enabled())
@@ -461,6 +478,8 @@ void Helm::Impl::apply(const Navigation& nav, double time)
         if (record.getName().empty())
             return;
         process_node_record(record);
+        if (contact_manager_)
+            contact_manager_->handle_node_record(record);
         info_buffer_.setValue("NODE_REPORT", record.getSpec(), t);
         return;
     }
@@ -548,6 +567,9 @@ void Helm::Impl::apply_variable(const std::string& var, const Value& value, doub
     };
 
     const std::string sval = value.s;
+    if (contact_manager_)
+        contact_manager_->handle_mail(var, sval);
+
     if (var == "MOOS_MANUAL_OVERRIDE" || var == "MOOS_MANUAL_OVERIDE")
     {
         if (toupper(sval) == "FALSE")
@@ -744,6 +766,25 @@ void Helm::Impl::update_ledger_snap()
         ledger_snap_.setVSource(v, ledger_.getVSource(v));
     }
     ledger_snap_.setCurrTimeUTC(curr_time_);
+}
+
+void Helm::Impl::run_contact_manager()
+{
+    if (!contact_manager_)
+        return;
+    bool ok1, ok2, ok3, ok4;
+    const double osx = info_buffer_.dQuery("NAV_X", ok1);
+    const double osy = info_buffer_.dQuery("NAV_Y", ok2);
+    const double osh = info_buffer_.dQuery("NAV_HEADING", ok3);
+    const double osv = info_buffer_.dQuery("NAV_SPEED", ok4);
+    contact_manager_->set_ownship(ok1 ? osx : 0, ok2 ? osy : 0, ok3 ? osh : 0, ok4 ? osv : 0);
+
+    for (const auto& post : contact_manager_->iterate(curr_time_, status_ == Status::DRIVE))
+    {
+        const Value value{post.is_string, post.d, post.s};
+        add_posting(Posting::CONTACT_MANAGER, "", post.var, value);
+        notify(post.var, value);
+    }
 }
 
 void Helm::Impl::update_plat_model()
