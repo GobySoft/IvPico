@@ -16,8 +16,9 @@
 // along with IvPico. If not, see <https://www.gnu.org/licenses/>.
 
 // goby_moos_gateway plugin that gives a MOOS community what pHelmIvP and its
-// navigation would post (NAV_*, the helm's postings, IVPHELM_*), so MOOS-IvP
-// tools such as pNodeReporter and pMarineViewer work with goby_helm_ivp.
+// navigation would post (NAV_*, the helm's postings, VIEW_*, NODE_MESSAGE_LOCAL,
+// IVPHELM_*), so MOOS-IvP tools such as pNodeReporter and pMarineViewer work
+// with goby_helm_ivp.
 
 #include <goby/middleware/marshalling/protobuf.h>
 
@@ -28,6 +29,7 @@
 #include <goby/zeromq/application/multi_thread.h>
 
 #include "groups.h"
+#include "helm/conversions.h"
 #include "helm/status_strings.h"
 #include "interface/ivp.pb.h"
 #include "moos_gateway_config.pb.h"
@@ -53,6 +55,15 @@ class MOOSGatewayTranslation : public ::goby::moos::Translator
             [this](const ivp::interface::Posting& posting) { post(posting); });
         goby().interprocess().subscribe<groups::status>([this](const ivp::interface::Status& status)
                                                         { post(status); });
+        goby().interprocess().subscribe<groups::visualization>(
+            [this](const ivp::interface::Visualization& vis)
+            {
+                const auto [var, spec] = helm::view_posting(vis);
+                moos().comms().Notify(var, spec);
+            });
+        goby().interprocess().subscribe<groups::offboard_message>(
+            [this](const ivp::interface::OffboardMessage& msg)
+            { moos().comms().Notify("NODE_MESSAGE_LOCAL", helm::node_message_spec(msg)); });
 
         for (const auto& var : cfg_.to_helm())
             moos().add_trigger(var, [this](const CMOOSMsg& msg) { to_helm(msg); });

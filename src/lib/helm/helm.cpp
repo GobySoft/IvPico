@@ -158,7 +158,11 @@ class Helm::Impl
 
   private:
     void configure();
+    void build_behaviors();
     void start(double time);
+    void restart(const std::string& type);
+    void update_configuration();
+    bool skewed(const std::string& var, double msg_time);
 
     // mail
     void apply_pending(double time);
@@ -219,6 +223,9 @@ class Helm::Impl
     bool park_on_allstop_{true};
     double nav_grace_{5};
     double defer_window_{1};
+    double ok_skew_{60};
+    bool restart_post_pending_{false};
+    std::string configuration_;
 
     bool started_{false};
     double curr_time_{0};
@@ -268,20 +275,6 @@ void Helm::Impl::configure()
     if (cfg_.has_defer_window())
         defer_window_ = cfg_.defer_window();
 
-    for (const auto& d : cfg_.domain())
-    {
-        unsigned points = d.points();
-        const double range = d.high() - d.low();
-        if (d.resolution_case() == HelmConfig::Domain::kDelta && d.delta() > 0 && range > 0 &&
-            d.delta() <= range)
-            points = static_cast<unsigned>(range / d.delta() + 1);
-        if (d.high() < d.low() || (range == 0 && points != 1) ||
-            !domain_.addDomain(d.name().c_str(), d.low(), d.high(), points))
-            config_warnings_.push_back("Bad domain: " + d.ShortDebugString());
-        if (d.optional())
-            optional_vars_.insert(d.name());
-    }
-
     if (geodesy_)
         ledger_.setGeodesy(geodesy_->to_local, geodesy_->to_global);
     double contact_max_age = cfg_.has_contact_max_age() ? cfg_.contact_max_age() : 45;
@@ -311,6 +304,35 @@ void Helm::Impl::configure()
 
     if (!cfg_.has_seed_random() || cfg_.seed_random())
         srand(static_cast<unsigned>(time(nullptr) * 31 + getpid()));
+
+    if (cfg_.has_ok_skew())
+        ok_skew_ = cfg_.ok_skew();
+
+    build_behaviors();
+}
+
+// The behaviors and the domain, at startup and on each restart
+void Helm::Impl::build_behaviors()
+{
+    delete bhv_set_;
+    bhv_set_ = nullptr;
+    engine_.reset();
+    domain_ = IvPDomain();
+    optional_vars_.clear();
+
+    for (const auto& d : cfg_.domain())
+    {
+        unsigned points = d.points();
+        const double range = d.high() - d.low();
+        if (d.resolution_case() == HelmConfig::Domain::kDelta && d.delta() > 0 && range > 0 &&
+            d.delta() <= range)
+            points = static_cast<unsigned>(range / d.delta() + 1);
+        if (d.high() < d.low() || (range == 0 && points != 1) ||
+            !domain_.addDomain(d.name().c_str(), d.low(), d.high(), points))
+            config_warnings_.push_back("Bad domain: " + d.ShortDebugString());
+        if (d.optional())
+            optional_vars_.insert(d.name());
+    }
 
     if (!config_warnings_.empty())
         return;
@@ -366,6 +388,90 @@ void Helm::Impl::start(double time)
     notify("IVPHELM_MODESET", bhv_set_->getModeSetDefinition());
     if (!cfg_.helm_alias().empty())
         notify("IVPHELM_ALIAS", cfg_.helm_alias());
+    update_configuration();
+}
+
+// HelmIvP's RESTART_HELM: type1 rebuilds the behaviors, type2 also posts the
+// "initialize" variables again. Unlike pHelmIvP, the behavior files are kept.
+void Helm::Impl::restart(const std::string& type)
+{
+    if (type != "type1" && type != "type2")
+        return;
+
+    outgoing_strings_.clear();
+    outgoing_doubles_.clear();
+    init_vars_done_ = false;
+    config_warnings_.clear();
+    build_behaviors();
+    if (!config_warnings_.empty())
+    {
+        status_ = Status::MALCONFIG;
+        has_control_ = false;
+        return;
+    }
+
+    if (type == "type2")
+        post_initial_variables(false);
+    register_variables();
+    notify("IVPHELM_DOMAIN", domainToString(domain_));
+    notify("IVPHELM_MODESET", bhv_set_->getModeSetDefinition());
+    if (!cfg_.helm_alias().empty())
+        notify("IVPHELM_ALIAS", cfg_.helm_alias());
+    restart_post_pending_ = true;
+    add_behavior_event(BehaviorEvent::WARNING, "", "The helm has been restarted");
+    update_configuration();
+}
+
+// IVPHELM_DOMAIN, IVPHELM_MODESET, IVPHELM_STATEVARS, IVPHELM_UPDATEVARS and
+// IVPHELM_REGISTER as one Configuration, output when any of them changes
+void Helm::Impl::update_configuration()
+{
+    if (!bhv_set_)
+        return;
+
+    ivp::interface::Configuration c;
+    c.set_alias(cfg_.helm_alias());
+    for (unsigned i = 0; i < domain_.size(); ++i)
+    {
+        auto& d = *c.add_domain();
+        d.set_name(domain_.getVarName(i));
+        d.set_low(domain_.getVarLow(i));
+        d.set_high(domain_.getVarHigh(i));
+        d.set_points(domain_.getVarPoints(i));
+        d.set_optional_decision(optional_vars_.count(d.name()) > 0);
+    }
+    c.set_mode_set(bhv_set_->getModeSetDefinition());
+    for (const auto& var : parseString(bhv_set_->getStateSpaceVars(), ','))
+        if (!var.empty())
+            c.add_state_variable(var);
+    for (auto pair : parseString(bhv_set_->getUpdateVarSummary(), ','))
+    {
+        if (pair.empty())
+            continue;
+        auto& u = *c.add_update_variable();
+        u.set_behavior(biteStringX(pair, '='));
+        u.set_variable(pair);
+    }
+    for (const auto& var : registered_) c.add_subscription(var);
+
+    const std::string serialized = c.SerializeAsString();
+    if (serialized == configuration_)
+        return;
+    configuration_ = serialized;
+    c.set_time(micros(curr_time_));
+    output_.configuration = c;
+}
+
+// HelmIvP::OnNewMail ignores mail more than ok_skew from the helm's clock
+bool Helm::Impl::skewed(const std::string& var, double msg_time)
+{
+    const double skew = std::fabs(curr_time_ - msg_time);
+    if (ok_skew_ < 0 || skew <= ok_skew_ || var == "HELM_MAP_CLEAR")
+        return false;
+    const std::string msg = "Helm ignores " + var + " due to skew: " + doubleToString(skew, 2);
+    add_behavior_event(BehaviorEvent::WARNING, "", msg);
+    notify("IVPHELM_SKEW", msg + " curr_time: " + doubleToString(curr_time_, 3));
+    return true;
 }
 
 const Output& Helm::Impl::iterate(double time)
@@ -439,6 +545,12 @@ const Output& Helm::Impl::iterate(double time)
     if (time - start_time_ < 1)
         return output_;
 
+    if (restart_post_pending_)
+    {
+        notify("IVPHELM_RESTARTED", "true");
+        restart_post_pending_ = false;
+    }
+
     update_plat_model();
     report_ = engine_->determineNextDecision(bhv_set_, time);
     iteration_ = report_.getIteration();
@@ -457,6 +569,10 @@ const Output& Helm::Impl::iterate(double time)
     post_life_events();
     post_decisions();
 
+    if (bhv_set_->refreshMapUpdateVars())
+        notify("IVPHELM_UPDATEVARS", bhv_set_->getUpdateVarSummary());
+    update_configuration();
+
     fill_status();
     info_buffer_.clearDeltaVectors();
     return output_;
@@ -467,9 +583,16 @@ void Helm::Impl::apply_pending(double time)
     for (const auto& input : pending_)
     {
         if (const auto* nav = std::get_if<Navigation>(&input))
-            apply(*nav, time);
+        {
+            // a contact's time is when it was reported, which the ledger ages itself
+            if (!nav->self() || nav->nav().time() == 0 ||
+                !skewed("NAV", seconds(nav->nav().time(), time)))
+                apply(*nav, time);
+        }
         else if (const auto* var = std::get_if<Variable>(&input))
         {
+            if (var->time() != 0 && skewed(var->key(), seconds(var->time(), time)))
+                continue;
             Value value;
             value.is_string = var->value_case() == Variable::kSval;
             value.d = var->dval();
@@ -559,6 +682,11 @@ void Helm::Impl::apply(const Command& command, double time)
             apply_variable("BHV_ABLE_FILTER",
                            Value{true, 0, able_filter_string(command.able_filter())}, time);
             break;
+        case Command::kRestart:
+            restart(command.restart().type() == Command::Restart::REBUILD_AND_REINITIALIZE ? "type2"
+                    : command.restart().type() == Command::Restart::REBUILD_BEHAVIORS      ? "type1"
+                                                                                           : "");
+            break;
         case Command::kCommsPolicy:
             comms_policy_ = tolower(Command::CommsPolicy_Name(command.comms_policy()));
             break;
@@ -593,11 +721,10 @@ void Helm::Impl::apply_variable(const std::string& var, const Value& value, doub
             set_manual_override(true);
         store();
     }
+    else if (var == "RESTART_HELM")
+        restart(sval);
     // Status is always complete, so there's nothing to rejournal
-    else if (var == "IVPHELM_STATE" || var == "DB_CLIENTS" || var == "RESTART_HELM" ||
-             var == "IVPHELM_REJOURNAL")
-    {
-    }
+    else if (var == "IVPHELM_STATE" || var == "DB_CLIENTS" || var == "IVPHELM_REJOURNAL") {}
     else if (var == "BHV_ABLE_FILTER")
         engine_->addAbleFilterMsg(sval);
     else if (var == "NODE_REPORT_LOCAL")
@@ -875,13 +1002,28 @@ void Helm::Impl::post_behavior_messages()
             if (auto kind = behavior_event_kind(var, key))
                 add_behavior_event(*kind, bhv,
                                    value.is_string ? value.s : doubleToStringX(value.d));
+            else if (auto vis = value.is_string ? visualization(var, value.s) : std::nullopt)
+            {
+                vis->set_time(micros(curr_time_));
+                vis->set_behavior(bhv);
+                vis->set_iteration(iteration_);
+                output_.visualizations.push_back(*vis);
+            }
+            else if (auto msg = var == "NODE_MESSAGE_LOCAL" && value.is_string
+                                    ? offboard_message(value.s)
+                                    : std::nullopt)
+            {
+                msg->set_time(micros(curr_time_));
+                output_.offboard_messages.push_back(*msg);
+            }
             else
                 add_posting(Posting::BEHAVIOR, bhv, var, value);
             notify(var, value);
         }
     }
 
-    bhv_set_->updateStateSpaceVars();
+    if (bhv_set_->updateStateSpaceVars())
+        notify("IVPHELM_STATEVARS", bhv_set_->getStateSpaceVars());
     bhv_set_->removeCompletedBehaviors();
 }
 
