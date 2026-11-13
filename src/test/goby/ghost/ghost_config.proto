@@ -26,7 +26,8 @@ package ivpico.goby.protobuf;
 message GhostConfig
 {
     optional .goby.middleware.protobuf.AppConfig app = 1;
-    optional .goby.zeromq.protobuf.InterProcessPortalConfig interprocess = 2;
+    optional .goby.zeromq.protobuf.InterProcessPortalConfig interprocess = 2
+        [(.goby.field) = { cfg { env: "GOBY_INTERPROCESS" } }];
 
     required string alog = 10 [(.goby.field).description = "xz-compressed alog with the contacts' NODE_REPORTs"];
     repeated string vehicle = 11 [(.goby.field).description = "Contacts to replay (NODE_REPORT NAME)"];

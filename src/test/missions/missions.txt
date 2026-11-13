@@ -24,5 +24,6 @@ s1_alpha_obsavoid alpha.moos 10    600      DEPLOY=true MOOS_MANUAL_OVERRIDE=fal
 m2_berta      launch.sh     4     600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
 berta_cmgr    launch.sh     4     600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
 m15_pursuit   launch.sh     4     600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
-ufld_convoy   launch.sh     4     600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
 m34_bo_alpha  launch.sh     4     600      DEPLOY=true MOOS_MANUAL_OVERRIDE=false
+# ufld_convoy is left out: its pHelmIvP looks for behaviors in a directory on
+# its author's machine, and is MALCONFIG anywhere else

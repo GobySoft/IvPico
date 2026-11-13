@@ -1,11 +1,12 @@
 # m2_berta: abe loiters while ben, a ghost replayed from the recording, passes
 # through; abe's avdcol_ behavior spawns from the helm's own contact alert.
-# Times are real seconds: a tenth of mission time.
+# Times are real seconds: a tenth of mission time. The ghost fixture runs in
+# this directory, the others in the one above.
 include: [../closed_loop.yml]
 
 fixture:
   - name: ghost
-    command: cat common.pb.cfg m2_berta/ghost.pb.cfg | ${GHOST} -
+    command: cat ../common.pb.cfg ghost.pb.cfg | ${GHOST} -
     env: ['GOBY_INTERPROCESS=platform: "ivpico_${MISSION}"']
 
 test:
@@ -29,6 +30,12 @@ test:
             - group: ivpico::helm::life_event
               type: ivp.interface.LifeEvent
               match: 'type: SPAWN behavior: "avdcol_ben"'
+              timeout: 48
+        - name: meets ben
+          expect:
+            - group: ivpico::test::ghost_range
+              type: ivp.interface.Variable
+              condition: [{ field: dval, op: LT, value: "100" }]
               timeout: 48
         - name: keeps clear of ben
           expect:

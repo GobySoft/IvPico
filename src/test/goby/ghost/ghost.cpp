@@ -133,8 +133,10 @@ void ivpico::goby::Ghost::read_alog()
         if (!(fields >> time >> var >> source))
             continue;
         std::getline(fields, value);
-        value = value.substr(value.find_first_not_of(' '));
-        value = value.substr(0, value.find_last_not_of(' ') + 1);
+        const auto begin = value.find_first_not_of(" \t");
+        value = begin == std::string::npos
+                    ? ""
+                    : value.substr(begin, value.find_last_not_of(" \t") - begin + 1);
 
         if (!drive && var == "IVPHELM_STATE" && value == "DRIVE")
             drive = time;
