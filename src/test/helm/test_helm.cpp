@@ -140,10 +140,10 @@ std::string mode(const Output& out)
 //  - after DEPLOY and the override, DRIVE in mode ACTIVE:SURVEYING, heading north;
 //  - reaching the waypoint posts RETURN=true.
 // On the iteration the survey completes, no behavior produces an objective
-// function, so the helm declares NothingToDo. With park_on_allstop (the
-// default) it then parks, as pHelmIvP does at the end of s1_alpha's survey.
-// Without it, RETURN=true switches to ACTIVE:RETURNING and turns the vehicle
-// around.
+// function, so the helm declares NothingToDo. That's an allstop pHelmIvP
+// rides out for an iteration, and park_on_allstop only parks on errors, so
+// with it set or not, RETURN=true then switches to ACTIVE:RETURNING and turns
+// the vehicle around without parking.
 void waypoint_mission(bool park_on_allstop)
 {
     const std::string scenario =
@@ -222,10 +222,8 @@ Behavior = BHV_Waypoint
     }
     check(surveying, scenario, "never surveyed north in DRIVE");
     check(returned, scenario, "waypt_survey never posted its endflag RETURN=true");
-    if (park_on_allstop)
-        check(parked && !turned, scenario, "didn't park when the survey completed");
-    else
-        check(turned && !parked, scenario, "never turned south in mode ACTIVE:RETURNING");
+    check(turned, scenario, "never turned south in mode ACTIVE:RETURNING");
+    check(!parked, scenario, "parked after the survey");
 }
 
 // One behavior posts an update for another: a timer's endflag posts
@@ -439,9 +437,9 @@ Behavior = BHV_AvoidCollision
 
 // Allstop reasons and park-on-allstop:
 //  - no speed decision with a required speed domain gives
-//    MISSING_DECISION_VARIABLES and PARK, since park_on_allstop defaults to
-//    true. pHelmIvP parks during the one iteration's grace it gives a missing
-//    decision, so the zero solution comes with MANUAL_OVERRIDE;
+//    MISSING_DECISION_VARIABLES. pHelmIvP gives a missing decision an
+//    iteration's grace, and park_on_allstop parks only on errors, so the helm
+//    stays in DRIVE and posts no solution while the decision is missing;
 //  - with speed optional, the same behaviors give a CLEAR solution;
 //  - manual override in DRIVE gives MANUAL_OVERRIDE and PARK.
 void allstop()
@@ -461,7 +459,7 @@ Behavior = BHV_ConstantHeading
         Helm helm(cfg);
         Vehicle vehicle;
         double t = t0;
-        bool missing = false, zeroed = false;
+        bool missing = false, solution = false;
         for (int i = 0; i < 12; ++i)
         {
             helm.handle(vehicle.navigation(t));
@@ -470,14 +468,13 @@ Behavior = BHV_ConstantHeading
                 out.status.missing_decision_variables_size() == 1 &&
                 out.status.missing_decision_variables(0) == "speed")
                 missing = true;
-            if (out.solution && out.solution->allstop() != ivp::interface::CLEAR &&
-                out.solution->desired().speed().value() == 0)
-                zeroed = true;
+            if (out.solution)
+                solution = true;
             t += dt;
         }
         check(missing, scenario, "no MISSING_DECISION_VARIABLES for speed");
-        check(zeroed, scenario, "no zero solution for the missing speed");
-        check(helm.state() == Status::PARK, scenario, "didn't park on allstop");
+        check(!solution, scenario, "a solution without a speed decision");
+        check(helm.state() == Status::DRIVE, scenario, "parked on a missing decision");
     }
     {
         auto cfg = config(bhv);

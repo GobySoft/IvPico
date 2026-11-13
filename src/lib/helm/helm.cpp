@@ -214,7 +214,6 @@ class Helm::Impl
     std::string allstop_msg_;
     std::string allstop_reason_;
     unsigned no_decisions_{0};
-    unsigned no_goal_decisions_{0};
     std::string comms_policy_{"open"};
     unsigned iteration_{0};
     std::vector<std::string> missing_decision_vars_;
@@ -438,9 +437,6 @@ const Output& Helm::Impl::iterate(double time)
     post_behavior_messages();
     post_life_events();
     post_decisions();
-
-    if (allstop_msg_ != "clear" && allow_park_ && park_on_allstop_)
-        has_control_ = false;
 
     fill_status();
     info_buffer_.clearDeltaVectors();
@@ -951,8 +947,9 @@ void Helm::Impl::post_allstop(const std::string& msg)
     allstop_msg_ = msg;
     allstop_reason_ = msg;
     no_decisions_ =
-        (msg == "NothingToDo" || strBegins(msg, "MissingDecVars")) ? no_decisions_ + 1 : 0;
-    no_goal_decisions_ = msg == "NoGoalBehavior" ? no_goal_decisions_ + 1 : 0;
+        (msg == "NothingToDo" || msg == "NoGoalBehavior" || strBegins(msg, "MissingDecVars"))
+            ? no_decisions_ + 1
+            : 0;
 
     notify("IVPHELM_ALLSTOP", msg);
     if (msg == "clear")
@@ -960,15 +957,12 @@ void Helm::Impl::post_allstop(const std::string& msg)
 
     // one iteration's grace to let the helm move between modes
     if (no_decisions_ == 1)
-    {
-        allstop_msg_ = "IncompleteOrEmptyDecision";
         return;
-    }
-    if (no_goal_decisions_ == 1)
-    {
-        allstop_msg_ = "NoActiveGoalBehavior";
-        return;
-    }
+
+    // other allstops keep control, and the helm decides again once they clear
+    if (allow_park_ && park_on_allstop_ &&
+        (msg == "BehaviorError" || msg == "DisabledByStandbyHelm"))
+        has_control_ = false;
 
     ivp::interface::Solution solution;
     solution.set_allstop(allstop_enum(msg));

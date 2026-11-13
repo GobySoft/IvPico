@@ -33,7 +33,7 @@ message HelmConfig
     bool start_in_drive = 4;
     // default true
     optional bool allow_park = 5;
-    // default true
+    // park on an allstop from a behavior error; default true
     optional bool park_on_allstop = 6;
     // seconds before warning that NAV_X, NAV_Y, etc. are still missing; default 5
     optional double nav_grace = 7;
