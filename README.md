@@ -38,6 +38,15 @@ ctest --test-dir build
 
 `build.sh` passes any arguments on to IvPico's CMake, and `BUILD_DIR` overrides the build directory. Add `build/usr/bin` to your `PATH` to run the installed apps.
 
+## Helm library
+
+*Outline, to be written:*
+
+- `ivpico::helm::Helm`: construct from a `HelmConfig`, `handle()` the inputs, `iterate()` at the helm's rate.
+- Each iteration's `Output` (solution, status, postings, behavior events, visualizations, offboard messages, life events, objective functions, configuration) and its pHelmIvP equivalent.
+- Field levels (CORE, ADVANCED, DEVELOPER) and what each adds to `Status` and `HelmConfig`.
+- Differences from pHelmIvP: the MOOSDB echo, rejournal, standby helm.
+
 ## Goby app
 
 *This section was written by Claude.*

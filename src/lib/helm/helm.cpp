@@ -19,6 +19,7 @@
 
 #include "helm.h"
 
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
@@ -224,6 +225,12 @@ class Helm::Impl
     double nav_grace_{5};
     double defer_window_{1};
     double ok_skew_{60};
+    unsigned warning_count_{0};
+    // percent of a CPU the helm used between iterations
+    double cpu_load_{0};
+    std::clock_t last_cpu_{0};
+    std::chrono::steady_clock::time_point last_wall_;
+    void update_cpu_load();
     bool restart_post_pending_{false};
     std::string configuration_;
 
@@ -474,10 +481,26 @@ bool Helm::Impl::skewed(const std::string& var, double msg_time)
     return true;
 }
 
+void Helm::Impl::update_cpu_load()
+{
+    const std::clock_t cpu = std::clock();
+    const auto wall = std::chrono::steady_clock::now();
+    if (last_cpu_ != 0)
+    {
+        const double wall_seconds = std::chrono::duration<double>(wall - last_wall_).count();
+        if (wall_seconds > 0)
+            cpu_load_ =
+                100.0 * static_cast<double>(cpu - last_cpu_) / CLOCKS_PER_SEC / wall_seconds;
+    }
+    last_cpu_ = cpu;
+    last_wall_ = wall;
+}
+
 const Output& Helm::Impl::iterate(double time)
 {
     output_ = Output();
     curr_time_ = time;
+    update_cpu_load();
 
     info_buffer_.setCurrTime(time);
     ledger_.setCurrTimeUTC(time);
@@ -1163,30 +1186,66 @@ void Helm::Impl::fill_status()
         mode.set_value(pair.is_string() ? pair.get_sdata() : doubleToStringX(pair.get_ddata()));
     }
 
-    std::map<std::string, Status::Behavior::RunState> run_states;
+    // HelmReport's full lists: "name$time$updates" entries separated by ':', and
+    // for active behaviors "name$time$pwt$pieces$cpu$updates$ipfs$mode$submode"
+    std::map<std::string, Status::Behavior> details;
     auto add_states = [&](const std::string& list, Status::Behavior::RunState state)
     {
-        for (const auto& name : parseString(list, ','))
-            if (!name.empty())
-                run_states[name] = state;
+        for (const auto& entry : parseString(list, ':'))
+        {
+            const auto fields = parseString(entry, '$');
+            if (fields.empty() || fields[0].empty())
+                continue;
+            Status::Behavior& b = details[fields[0]];
+            b.Clear();
+            b.set_run_state(state);
+            if (state == Status::Behavior::ACTIVE && fields.size() >= 6)
+            {
+                b.set_priority_weight(atof(fields[2].c_str()));
+                b.set_pieces(static_cast<unsigned>(atoi(fields[3].c_str())));
+                b.set_create_cpu(atof(fields[4].c_str()));
+                b.set_update_summary(fields[5]);
+            }
+            else if (fields.size() >= 3)
+                b.set_update_summary(fields[2]);
+        }
     };
     // first, since a respawned behavior keeps the name of one that completed
-    add_states(report_.getCompletedBehaviors(false), Status::Behavior::COMPLETED);
-    add_states(report_.getIdleBehaviors(false), Status::Behavior::IDLE);
-    add_states(report_.getRunningBehaviors(false), Status::Behavior::RUNNING);
-    add_states(report_.getActiveBehaviors(false), Status::Behavior::ACTIVE);
-    add_states(report_.getDisabledBehaviors(false), Status::Behavior::DISABLED);
+    add_states(report_.getCompletedBehaviors(true), Status::Behavior::COMPLETED);
+    add_states(report_.getIdleBehaviors(true), Status::Behavior::IDLE);
+    add_states(report_.getRunningBehaviors(true), Status::Behavior::RUNNING);
+    add_states(report_.getActiveBehaviors(true), Status::Behavior::ACTIVE);
+    add_states(report_.getDisabledBehaviors(true), Status::Behavior::DISABLED);
 
     for (unsigned i = 0; i < bhv_set_->size(); ++i)
     {
         auto& b = *s.add_behavior();
-        b.set_name(bhv_set_->getDescriptor(i));
+        const std::string name = bhv_set_->getDescriptor(i);
+        auto it = details.find(name);
+        if (it != details.end())
+            b = it->second;
+        b.set_name(name);
         b.set_type(bhv_set_->getBehavior(i)->getBehaviorType());
-        auto it = run_states.find(b.name());
-        b.set_run_state(it == run_states.end() ? Status::Behavior::RUN_STATE_UNKNOWN : it->second);
         b.set_state_time_entered(micros(bhv_set_->getStateTimeEntered(i)));
         b.set_mode(bhv_set_->getBehaviorMode(i));
         b.set_submode(bhv_set_->getBehaviorSubMode(i));
+    }
+    s.set_completed_count(report_.getCompletedCnt());
+    s.set_warning_count(warning_count_);
+    s.set_cpu_load(cpu_load_);
+
+    s.clear_update_result();
+    for (const auto& result : report_.getUpdateResults())
+    {
+        auto& u = *s.add_update_result();
+        u.set_behavior(tokStringParse(result, "bhv", ',', '='));
+        u.set_variable(tokStringParse(result, "var", ',', '='));
+        const std::string r = tokStringParse(result, "result", ',', '=');
+        u.set_result(r == "success"         ? Status::UpdateResult::SUCCESS
+                     : r == "duplicate"     ? Status::UpdateResult::DUPLICATE
+                     : r == "name_mismatch" ? Status::UpdateResult::NAME_MISMATCH
+                     : r == "param_error"   ? Status::UpdateResult::PARAM_ERROR
+                                            : Status::UpdateResult::RESULT_UNKNOWN);
     }
     s.set_behavior_count(bhv_set_->size());
     s.set_behavior_count_ever(bhv_set_->getTCount());
@@ -1252,6 +1311,8 @@ Posting& Helm::Impl::add_posting(Posting::Origin origin, const std::string& beha
 void Helm::Impl::add_behavior_event(BehaviorEvent::Kind kind, const std::string& behavior,
                                     const std::string& text)
 {
+    if (kind == BehaviorEvent::WARNING)
+        ++warning_count_;
     BehaviorEvent& event = output_.behavior_events.emplace_back();
     event.set_time(micros(curr_time_));
     event.set_behavior(behavior);

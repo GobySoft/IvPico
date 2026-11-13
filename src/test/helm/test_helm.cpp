@@ -847,6 +847,72 @@ Behavior = BHV_ConstantHeading
     check(bar, scenario, "never posted BAR");
 }
 
+// The DEVELOPER fields of Status and the objective functions. A timer sends ch
+// a good update and then a bad one (an unknown parameter), then completes, so
+// the status should show each update's result, the completed count, and ch's
+// priority weight, pieces and update summary while it is active.
+void developer_status()
+{
+    const std::string scenario = "developer_status";
+    auto cfg = config(write_bhv(scenario, R"(
+Behavior = BHV_ConstantHeading
+{
+  name     = ch
+  pwt      = 75
+  heading  = 90
+  duration = no-time-limit
+  updates  = CH_UPDATES
+}
+
+Behavior = BHV_Timer
+{
+  name     = timer
+  duration = 2
+  endflag  = CH_UPDATES = heading=180
+  endflag  = CH_UPDATES = nonsense=1
+}
+)"));
+    cfg.mutable_domain(1)->set_optional(true);
+    cfg.set_start_in_drive(true);
+    cfg.set_report_objective_functions(true);
+    Helm helm(cfg);
+    check(helm.config_warnings().empty(), scenario, "config warnings");
+
+    Vehicle vehicle;
+    double t = t0;
+    bool ch_details = false, success = false, param_error = false, completed = false, ipf = false;
+    std::string summary;
+    for (int i = 0; i < 40; ++i)
+    {
+        helm.handle(vehicle.navigation(t));
+        const Output& out = helm.iterate(t);
+        for (const auto& b : out.status.behavior())
+            if (b.name() == "ch" && b.run_state() == Status::Behavior::ACTIVE)
+            {
+                ch_details = ch_details || (std::fabs(b.priority_weight() - 75) < 1e-6 &&
+                                            b.pieces() >= 1 && b.has_create_cpu());
+                summary = b.update_summary();
+            }
+        for (const auto& u : out.status.update_result())
+        {
+            if (u.behavior() != "ch" || u.variable() != "CH_UPDATES")
+                continue;
+            success = success || u.result() == Status::UpdateResult::SUCCESS;
+            param_error = param_error || u.result() == Status::UpdateResult::PARAM_ERROR;
+        }
+        completed = completed || out.status.completed_count() == 1;
+        for (const auto& of : out.objective_functions)
+            ipf = ipf || (of.behavior() == "ch" && !of.encoding().empty());
+        t += dt;
+    }
+    check(ch_details, scenario, "no priority weight 75, pieces and create cpu for active ch");
+    check(success, scenario, "no SUCCESS update result for heading=180");
+    check(param_error, scenario, "no PARAM_ERROR update result for nonsense=1");
+    check(completed, scenario, "completed_count never 1 after the timer completed");
+    check(summary != "0/0", scenario, "ch's update summary never counted the updates");
+    check(ipf, scenario, "no objective function from ch");
+}
+
 } // namespace
 
 int main()
@@ -866,5 +932,6 @@ int main()
     allstop();
     malconfig();
     deferred_initialize();
+    developer_status();
     return errors == 0 ? 0 : 1;
 }
