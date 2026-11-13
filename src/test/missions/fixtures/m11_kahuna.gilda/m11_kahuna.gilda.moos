@@ -1,0 +1,366 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% LOG FILE:       ./LOG_GILDA_13_11_2026_____05_07_01/LOG_GILDA_13_11_2026_____05_07_01._moos
+%% FILE OPENED ON  Thu Jan  1 00:00:00 1970
+%% LOGSTART           7178185687.310444
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ServerHost = localhost
+ServerPort = 9002
+
+// Community name IS the vehicle name
+Community  = gilda
+  
+//----  Next Line was commented and replaced with a command line overload ---- //
+//MOOSTimeWarp = 4    (default)
+MOOSTimeWarp = 4
+LatOrigin  = 43.825300 
+LongOrigin = -70.330400 
+
+
+//--------------------------------------------------------
+// uTimerScript Configuration Block
+
+ProcessConfig = uTimerScript
+{
+  AppTick   = 4
+  CommsTick = 4
+  
+  PAUSED     = false
+  RESET_MAX  = unlimited
+  RESET_TIME = 100
+
+  RANDVAR = varname=S, min=1,  max=3, key=at_reset
+  
+//  EVENT = var=NODE_MESSAGE_LOCAL, val="src_node=gilda,dest_node=all,var_name=GILDA_UPDATES,string_val=speed=$[S]", time=0:5 
+  EVENT = var=GILDA_UPDATES, val="speed=$[S]", time=0:5 
+}
+
+
+ 
+
+
+   
+//------------------------------------------------------------
+ProcessConfig = ANTLER
+{
+  Run = uTimerScript @ NewConsole = false ~ uTimerScript_record
+  MSBetweenLaunches = 100
+   
+  Run = MOOSDB            @ NewConsole = false
+  Run = pLogger @ NewConsole = false
+  Run = uSimMarineV22     @ NewConsole = false
+  Run = pNodeReporter     @ NewConsole = false
+  Run = pMarinePIDV22     @ NewConsole = false
+  Run = pHelmIvP          @ NewConsole = false
+  Run = uProcessWatch     @ NewConsole = false
+
+  Run = pShare             @ NewConsole = false
+  Run = pHostInfo          @ NewConsole = false
+  Run = uFldNodeBroker     @ NewConsole = false
+  Run = uFldMessageHandler @ NewConsole = false
+  Run = uTimerScript       @ NewConsole = false
+}
+
+//---------------------------------------------------------
+// pShare Config Block  (Created from Plugin)
+
+ProcessConfig = pShare
+{
+  AppTick    = 2
+  CommsTick  = 2
+
+  input = route =  localhost:9302
+
+  // =======================================================
+  // Usage Info below
+  // =======================================================
+
+  // Simple forward of X to A on channel 8
+  // output = src_name = X,dest_name=A, route=multicast_8
+ 
+  // Simple forward of Y to B on a udp address
+
+  //output = src_name=Y, dest_name=B, route=localhost:9300
+ 
+  // Simple forward of Z to Z on a named address (no renaming)
+  // output = src_name = Z, route = oceanai.mit.edu:9020
+ 
+  // Setting up an input
+  // input = route = multicast_9
+  
+  //input = route = localhost:9302 & multicast_9
+
+ 
+  // Setting up lots of inputs at once
+  // input = route = "localhost:9069 & multicast_19 & multicast_65"
+}
+
+
+//--------------------------------------------------
+// pHostInfo configuration block from plugin
+
+ProcessConfig = pHostInfo
+{
+  AppTick 	= 1
+  CommsTick 	= 1
+
+  DEFAULT_HOSTIP = localhost
+}
+
+
+//--------------------------------------------------
+// pLogger Configuration Block (Created from Plugin)
+
+ProcessConfig = pLogger
+{
+  Log = AIS_REPORT @ 0 NOSYNC
+  Log = AIS_REPORT_LOCAL @ 0 NOSYNC
+  Log = APPCAST @ 0 NOSYNC
+  Log = AVD_DEBUG @ 0 NOSYNC
+  Log = AVOIDING @ 0 NOSYNC
+  Log = BCM_ALERT_REQUEST @ 0 NOSYNC
+  Log = BHV_ABLE_FILTER @ 0 NOSYNC
+  Log = BHV_IPF @ 0 NOSYNC
+  Log = BHV_SETTINGS @ 0 NOSYNC
+  Log = BHV_STATUS @ 0 NOSYNC
+  Log = BHV_WARNING @ 0 NOSYNC
+  Log = CONTACT_INFO @ 0 NOSYNC
+  Log = CONTACT_RESOLVED @ 0 NOSYNC
+  Log = CYCLE_INDEX @ 0 NOSYNC
+  Log = DB_CLIENTS @ 0 NOSYNC
+  Log = DEPLOY @ 0 NOSYNC
+  Log = DESIRED_HEADING @ 0 NOSYNC
+  Log = DESIRED_SPEED @ 0 NOSYNC
+  Log = GILDA_UPDATES @ 0 NOSYNC
+  Log = HELM_MAP_CLEAR @ 0 NOSYNC
+  Log = IVPHELM_ALLSTOP @ 0 NOSYNC
+  Log = IVPHELM_BHV_ACTIVE @ 0 NOSYNC
+  Log = IVPHELM_BHV_ACTIVE_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_CNT_EVER @ 0 NOSYNC
+  Log = IVPHELM_BHV_DISABLED_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_IDLE @ 0 NOSYNC
+  Log = IVPHELM_BHV_IDLE_CNT @ 0 NOSYNC
+  Log = IVPHELM_BHV_RUNNING @ 0 NOSYNC
+  Log = IVPHELM_BHV_RUNNING_CNT @ 0 NOSYNC
+  Log = IVPHELM_COMPLETED_COUNT @ 0 NOSYNC
+  Log = IVPHELM_COMPLETED_PENDING @ 0 NOSYNC
+  Log = IVPHELM_CONTACT_SUMMARY @ 0 NOSYNC
+  Log = IVPHELM_CPU @ 0 NOSYNC
+  Log = IVPHELM_CREATE_CPU @ 0 NOSYNC
+  Log = IVPHELM_DOMAIN @ 0 NOSYNC
+  Log = IVPHELM_IPF_CNT @ 0 NOSYNC
+  Log = IVPHELM_ITER @ 0 NOSYNC
+  Log = IVPHELM_LEDGER_SUMMARY @ 0 NOSYNC
+  Log = IVPHELM_LIFE_EVENT @ 0 NOSYNC
+  Log = IVPHELM_LOOP_CPU @ 0 NOSYNC
+  Log = IVPHELM_MODESET @ 0 NOSYNC
+  Log = IVPHELM_REGISTER @ 0 NOSYNC
+  Log = IVPHELM_REJOURNAL @ 0 NOSYNC
+  Log = IVPHELM_STATE @ 0 NOSYNC
+  Log = IVPHELM_STATEVARS @ 0 NOSYNC
+  Log = IVPHELM_SUMMARY @ 0 NOSYNC
+  Log = IVPHELM_TOTAL_PCS_CACHED @ 0 NOSYNC
+  Log = IVPHELM_TOTAL_PCS_FORMED @ 0 NOSYNC
+  Log = IVPHELM_UPDATEVARS @ 0 NOSYNC
+  Log = IVPHELM_UPDATE_RESULT @ 0 NOSYNC
+  Log = LOITER @ 0 NOSYNC
+  Log = LOITER_ACQUIRE @ 0 NOSYNC
+  Log = LOITER_DIST_TO_POLY @ 0 NOSYNC
+  Log = LOITER_DIST_TO_VERT @ 0 NOSYNC
+  Log = LOITER_ETA_TO_POLY @ 0 NOSYNC
+  Log = LOITER_INDEX @ 0 NOSYNC
+  Log = LOITER_MODE @ 0 NOSYNC
+  Log = LOITER_REPORT @ 0 NOSYNC
+  Log = MODE @ 0 NOSYNC
+  Log = MOOS_DEBUG @ 0 NOSYNC
+  Log = MOOS_MANUAL_OVERIDE @ 0 NOSYNC
+  Log = MOOS_MANUAL_OVERRIDE @ 0 NOSYNC
+  Log = NAV_DEPTH @ 0 NOSYNC
+  Log = NAV_HEADING @ 0 NOSYNC
+  Log = NAV_SPEED @ 0 NOSYNC
+  Log = NAV_X @ 0 NOSYNC
+  Log = NAV_Y @ 0 NOSYNC
+  Log = NODE_REPORT @ 0 NOSYNC
+  Log = NODE_REPORT_LOCAL @ 0 NOSYNC
+  Log = PATROL @ 0 NOSYNC
+  Log = PHELMIVP_PID @ 0 NOSYNC
+  Log = PHELMIVP_STATUS @ 0 NOSYNC
+  Log = PLOGGER_CMD @ 0 NOSYNC
+  Log = RESTART_HELM @ 0 NOSYNC
+  Log = RETURN @ 0 NOSYNC
+  Log = RETURN_UPDATES @ 0 NOSYNC
+  Log = STATION_KEEP @ 0 NOSYNC
+  Log = TRAIL @ 0 NOSYNC
+  Log = TRAILING_ALLOWED @ 0 NOSYNC
+  Log = TRAIL_DISTANCE @ 0 NOSYNC
+  Log = TRAIL_INFO @ 0 NOSYNC
+  Log = TURN_RATE @ 0 NOSYNC
+  Log = UP_LOITER @ 0 NOSYNC
+  Log = VIEW_POINT @ 0 NOSYNC
+  Log = VIEW_POLYGON @ 0 NOSYNC
+  Log = VIEW_SEGLIST @ 0 NOSYNC
+  Log = WPT_INDEX @ 0 NOSYNC
+  Log = WPT_ODO @ 0 NOSYNC
+  Log = WPT_STAT @ 0 NOSYNC
+  AppTick 	= 10
+  CommsTick 	= 10
+  
+  File		= LOG_GILDA
+  PATH		= ./
+  SyncLog 	= true @ 0.2
+  AsyncLog 	= true
+  FileTimeStamp = true
+
+  Log = IVPHELM_LIFE_EVENT @ 0 nosync
+
+  // Log it all!!!!!
+  LogAuxSrc = true
+  WildCardLogging = true 
+}
+
+//---------------------------------------
+ProcessConfig = uProcessWatch
+{
+  AppTick   = 2
+  CommsTick = 2
+  
+	watch_all = true
+
+  nowatch = uXMS*
+  nowatch = uPokeDB*
+  nowatch = uQueryDB*
+}
+
+
+//--------------------------------------------------
+// uFldNodeBroker config block
+
+ProcessConfig = uFldNodeBroker
+{
+  AppTick   = 1
+  CommsTick = 1
+
+  try_shore_host = pshare_route=localhost:9300
+
+  bridge = src=VIEW_POLYGON
+  bridge = src=VIEW_POINT
+  bridge = src=VIEW_SEGLIST
+  bridge = src=VIEW_CIRCLE
+  bridge = src=APPCAST
+  bridge = src=NODE_REPORT_LOCAL,  alias=NODE_REPORT
+  bridge = src=NODE_MESSAGE_LOCAL, alias=NODE_MESSAGE
+}
+
+	//---------------------------------------
+ProcessConfig = pMarinePIDV22
+{
+  AppTick    = 10
+  CommsTick  = 10
+  
+  VERBOSE       = true
+  DEPTH_CONTROL = false
+  ACTIVE_START  = true
+  
+  // Yaw PID controller
+  YAW_PID_KP             = 0.4
+  YAW_PID_KD             = 0.1
+  YAW_PID_KI             = 0.0
+  YAW_PID_INTEGRAL_LIMIT = 0.07
+  
+  // Speed PID controller
+  SPEED_PID_KP           = 1.0
+  SPEED_PID_KD           = 0.0
+  SPEED_PID_KI           = 0.0
+  SPEED_PID_INTEGRAL_LIMIT = 0.07
+  
+  // Maximums
+  MAXRUDDER  = 100
+  MAXTHRUST  = 100
+  
+  // A non-zero SPEED_FACTOR overrides use of SPEED_PID
+  // Will set DESIRED_THRUST = DESIRED_SPEED * SPEED_FACTOR
+  SPEED_FACTOR = 20
+}
+
+
+//------------------------------------------
+ProcessConfig = uSimMarineV22
+{
+  AppTick   = 10
+  CommsTick = 10
+
+  start_pos = 80,-125
+  prefix    = NAV
+}
+
+
+//---------------------------------------
+ProcessConfig = pHelmIvP
+{
+  AppTick    = 4
+  CommsTick  = 4
+  
+  behaviors    = targ_gilda.bhv  
+  verbose      = false
+  domain       = course:0:359:360
+  domain       = speed:0:5:26
+}
+
+//--------------------------------------------------
+// uFldMessageHandler config block
+
+ProcessConfig = uFldMessageHandler
+{
+  AppTick   = 3
+  CommsTick = 3
+
+  strict_addressing = true
+}
+
+//---------------------------------------
+ProcessConfig = pNodeReporter
+{
+  AppTick     = 2
+  CommsTick   = 2
+  
+  platform_type = kayak
+}
+
+//---------------------------------------
+// pBasicContactMgr Config Block 
+
+ProcessConfig = pContactMgrV20
+{
+  AppTick   = 2
+  CommsTick = 2
+
+  contact_max_age = 3600
+  display_radii   = false
+
+	decay = 30,60
+	alert_verbose = false
+	
+  //default_alert_range = 20
+  //default_cpa_range   = 28
+  //default_alert_range_color = gray70
+  //default_cpa_range_color   = gray30
+
+  //alert = id=avd, var=CONTACT_INFO, val="name=$[VNAME] # contact=$[VNAME]"
+  //alert = id=avd, alert_range=50, cpa_range=60, alert_range_color=yellow
+  //alert = id=avd, cpa_range_color=pink
+
+  alert = id=trail, var=TRAIL_INFO, val="name=$[VNAME] # contact=$[VNAME]"
+  //alert = id=trail, alert_range=140, cpa_range=185, alert_range_color=green
+  alert = id=trail, alert_range=140, cpa_range=185
+  //alert = id=trail, cpa_range_color=white
+}
+	
+
+ProcessConfig = uTimerScript_record
+{
+  condition = (IVPHELM_STATE = PARK) or (IVPHELM_STATE = DRIVE)
+  event = var=DEPLOY, val=true, time=5
+  event = var=MOOS_MANUAL_OVERRIDE, val=false, time=5
+}
+
+
