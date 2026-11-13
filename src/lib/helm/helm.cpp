@@ -1015,11 +1015,12 @@ void Helm::Impl::fill_status()
             if (!name.empty())
                 run_states[name] = state;
     };
+    // first, since a respawned behavior keeps the name of one that completed
+    add_states(report_.getCompletedBehaviors(false), Status::Behavior::COMPLETED);
     add_states(report_.getIdleBehaviors(false), Status::Behavior::IDLE);
     add_states(report_.getRunningBehaviors(false), Status::Behavior::RUNNING);
     add_states(report_.getActiveBehaviors(false), Status::Behavior::ACTIVE);
     add_states(report_.getDisabledBehaviors(false), Status::Behavior::DISABLED);
-    add_states(report_.getCompletedBehaviors(false), Status::Behavior::COMPLETED);
 
     for (unsigned i = 0; i < bhv_set_->size(); ++i)
     {

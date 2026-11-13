@@ -407,8 +407,7 @@ Behavior = BHV_AvoidCollision
         {
             if (p.origin() != Posting::CONTACT_MANAGER)
                 continue;
-            if (p.key() == "CONTACT_INFO" && p.sval() == "name=bob # contact=bob" &&
-                alert_tick < 0)
+            if (p.key() == "CONTACT_INFO" && p.sval() == "name=bob # contact=bob" && alert_tick < 0)
                 alert_tick = i;
             if (p.key() == "CONTACT_INFO" && p.sval().find("ann") != std::string::npos)
                 ann_alerted = true;

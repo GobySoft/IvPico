@@ -45,13 +45,18 @@ ContactManager::ContactManager(const ivp::interface::HelmConfig::ContactManager&
     };
 
     filter_set_.addIgnoreName(ownship_);
-    for (const auto& v : cfg.ignore_name()) warn_unless(filter_set_.addIgnoreName(v), "ignore_name: " + v);
-    for (const auto& v : cfg.match_name()) warn_unless(filter_set_.addMatchName(v), "match_name: " + v);
+    for (const auto& v : cfg.ignore_name())
+        warn_unless(filter_set_.addIgnoreName(v), "ignore_name: " + v);
+    for (const auto& v : cfg.match_name())
+        warn_unless(filter_set_.addMatchName(v), "match_name: " + v);
     for (const auto& v : cfg.ignore_group())
         warn_unless(filter_set_.addIgnoreGroup(v), "ignore_group: " + v);
-    for (const auto& v : cfg.match_group()) warn_unless(filter_set_.addMatchGroup(v), "match_group: " + v);
-    for (const auto& v : cfg.ignore_type()) warn_unless(filter_set_.addIgnoreType(v), "ignore_type: " + v);
-    for (const auto& v : cfg.match_type()) warn_unless(filter_set_.addMatchType(v), "match_type: " + v);
+    for (const auto& v : cfg.match_group())
+        warn_unless(filter_set_.addMatchGroup(v), "match_group: " + v);
+    for (const auto& v : cfg.ignore_type())
+        warn_unless(filter_set_.addIgnoreType(v), "ignore_type: " + v);
+    for (const auto& v : cfg.match_type())
+        warn_unless(filter_set_.addMatchType(v), "match_type: " + v);
     for (const auto& v : cfg.ignore_region())
         warn_unless(filter_set_.addIgnoreRegion(v), "ignore_region: " + v);
     for (const auto& v : cfg.match_region())
@@ -88,7 +93,8 @@ ContactManager::ContactManager(const ivp::interface::HelmConfig::ContactManager&
     expunge_var_ = cfg.expunge_var();
     auto add_flags = [&](std::vector<VarDataPair>& flags, const auto& specs, const char* what)
     {
-        for (const auto& spec : specs) warn_unless(addVarDataPairOnString(flags, spec), what + (": " + spec));
+        for (const auto& spec : specs)
+            warn_unless(addVarDataPairOnString(flags, spec), what + (": " + spec));
     };
     add_flags(able_flags_, cfg.able_flag(), "able_flag");
     add_flags(disable_flags_, cfg.disable_flag(), "disable_flag");
@@ -98,9 +104,9 @@ ContactManager::ContactManager(const ivp::interface::HelmConfig::ContactManager&
     add_flags(cease_warning_flags_, cfg.cease_warning_flag(), "cease_warning_flag");
     add_flags(retire_flags_, cfg.retire_flag(), "retire_flag");
 
-    for (const auto& alert : cfg.alert()) warn_unless(handle_alert(alert, "general"), "alert: " + alert);
-    for (const auto& [id, alert] : alerts_)
-        warn_unless(alert.valid(), "alert (incomplete): " + id);
+    // an alert may be incomplete until a behavior's request completes it
+    for (const auto& alert : cfg.alert())
+        warn_unless(handle_alert(alert, "general"), "alert: " + alert);
 
     // retirement here does the culling
     ledger_.setMaxContacts(0);
@@ -353,8 +359,8 @@ void ContactManager::check_for_alerts()
                 msg += ",range_cpa=" + doubleToString(cpa_[contact], 1);
             if (early_warning_time_ > 0 && transition == "off-->alerted" &&
                 utc_was_warned_.count(contact))
-                msg += ",after_warning=" +
-                       doubleToStringX(curr_time_ - utc_was_warned_[contact], 2);
+                msg +=
+                    ",after_warning=" + doubleToStringX(curr_time_ - utc_was_warned_[contact], 2);
             notify("ALERT_VERBOSE", msg);
         }
     }

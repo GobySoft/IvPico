@@ -80,7 +80,10 @@ class ContactManager
     void post_flags(const std::vector<VarDataPair>& flags);
     void post_warning_flags(const std::vector<VarDataPair>& flags, const std::string& contact);
     void post_retire_flags(const std::vector<VarDataPair>& flags, const std::string& contact);
-    void notify(const std::string& var, const std::string& s) { posts_.push_back({var, true, 0, s}); }
+    void notify(const std::string& var, const std::string& s)
+    {
+        posts_.push_back({var, true, 0, s});
+    }
     void notify(const std::string& var, double d) { posts_.push_back({var, false, d, {}}); }
 
     std::string ownship_;
