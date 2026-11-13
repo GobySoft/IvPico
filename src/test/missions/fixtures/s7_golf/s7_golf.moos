@@ -1,7 +1,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% LOG FILE:       ./LOG_27_10_2026_____07_48_44/LOG_27_10_2026_____07_48_44._moos
+%% LOG FILE:       ./LOG_13_11_2026_____03_47_21/LOG_13_11_2026_____03_47_21._moos
 %% FILE OPENED ON  Thu Jan  1 00:00:00 1970
-%% LOGSTART           17930873244.76507
+%% LOGSTART           17945416410.06899
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //-------------------------------------------------
 // NAME: M. Benjamin, MIT CSAIL
@@ -61,18 +61,23 @@ ProcessConfig = pSafetyRetreat
 
 ProcessConfig = pLogger
 {
+  Log = AIS_REPORT @ 0 NOSYNC
+  Log = AIS_REPORT_LOCAL @ 0 NOSYNC
   Log = APPCAST @ 0 NOSYNC
+  Log = BHV_ABLE_FILTER @ 0 NOSYNC
   Log = BHV_ERROR @ 0 NOSYNC
   Log = BHV_IPF @ 0 NOSYNC
   Log = BHV_SETTINGS @ 0 NOSYNC
   Log = BHV_STATUS @ 0 NOSYNC
   Log = BHV_WARNING @ 0 NOSYNC
   Log = CYCLE_INDEX @ 0 NOSYNC
+  Log = DB_CLIENTS @ 0 NOSYNC
   Log = DEPLOY @ 0 NOSYNC
   Log = DESIRED_DEPTH @ 0 NOSYNC
   Log = DESIRED_HEADING @ 0 NOSYNC
   Log = DESIRED_SPEED @ 0 NOSYNC
   Log = GPS_UPDATE_RECEIVED @ 0 NOSYNC
+  Log = HELM_MAP_CLEAR @ 0 NOSYNC
   Log = IVPHELM_ALLSTOP @ 0 NOSYNC
   Log = IVPHELM_BHV_ACTIVE @ 0 NOSYNC
   Log = IVPHELM_BHV_ACTIVE_CNT @ 0 NOSYNC
@@ -94,6 +99,7 @@ ProcessConfig = pLogger
   Log = IVPHELM_LOOP_CPU @ 0 NOSYNC
   Log = IVPHELM_MODESET @ 0 NOSYNC
   Log = IVPHELM_REGISTER @ 0 NOSYNC
+  Log = IVPHELM_REJOURNAL @ 0 NOSYNC
   Log = IVPHELM_STATE @ 0 NOSYNC
   Log = IVPHELM_STATEVARS @ 0 NOSYNC
   Log = IVPHELM_SUMMARY @ 0 NOSYNC
@@ -108,16 +114,21 @@ ProcessConfig = pLogger
   Log = LOITER_REPORT_A @ 0 NOSYNC
   Log = MODE @ 0 NOSYNC
   Log = MOOS_DEBUG @ 0 NOSYNC
+  Log = MOOS_MANUAL_OVERIDE @ 0 NOSYNC
+  Log = MOOS_MANUAL_OVERRIDE @ 0 NOSYNC
   Log = NAV_DEPTH @ 0 NOSYNC
   Log = NAV_HEADING @ 0 NOSYNC
   Log = NAV_SPEED @ 0 NOSYNC
   Log = NAV_X @ 0 NOSYNC
   Log = NAV_Y @ 0 NOSYNC
+  Log = NODE_REPORT @ 0 NOSYNC
+  Log = NODE_REPORT_LOCAL @ 0 NOSYNC
   Log = PENDING_SURFACE @ 0 NOSYNC
   Log = PHELMIVP_PID @ 0 NOSYNC
   Log = PHELMIVP_STATUS @ 0 NOSYNC
   Log = PLOGGER_CMD @ 0 NOSYNC
   Log = PSURFACE @ 0 NOSYNC
+  Log = RESTART_HELM @ 0 NOSYNC
   Log = RETREAT_LOITER @ 0 NOSYNC
   Log = RETURN @ 0 NOSYNC
   Log = RETURNING @ 0 NOSYNC
@@ -129,6 +140,7 @@ ProcessConfig = pLogger
   Log = UP_RETREAT @ 0 NOSYNC
   Log = VIEW_POINT @ 0 NOSYNC
   Log = VIEW_POLYGON @ 0 NOSYNC
+  Log = VIEW_SEGLIST @ 0 NOSYNC
   Log = WPT_ODO @ 0 NOSYNC
   Log = WPT_STAT @ 0 NOSYNC
   AppTick	= 5
