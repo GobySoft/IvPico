@@ -38,7 +38,7 @@ while [ $# -gt 0 ]; do
 done
 
 goby_cfgs=(config/*.pb.cfg)
-image_dir=${IVP_IMAGE_DIRS:-../../../external/moos-ivp/ivp/data}
+image_dir=${IVP_IMAGE_DIRS:-images}
 
 # the smallest image whose .info bounds contain the datum
 image_for() {

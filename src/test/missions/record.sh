@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Records MOOS-IvP missions under pHelmIvP for the replay tests: builds all of
-# MOOS-IvP from external/moos-ivp, runs each mission in missions.txt headless,
-# and keeps each vehicle's helm inputs and outputs in fixtures/<mission>.
+# MOOS-IvP from GobySoft's ivp-without-moos branch (libivp-helm-dev's source),
+# runs each mission in missions.txt headless, and keeps each vehicle's helm
+# inputs and outputs in fixtures/<mission>.
 #
 # Usage: record.sh [mission...]   (default: every mission in missions.txt)
 #
 # WORK_DIR (default build/missions) holds the MOOS-IvP build and the runs.
+# MOOS_IVP_BRANCH overrides the branch.
 # MOOS_BUILD_ARGS are passed to build-moos.sh, e.g. --with-proj=off.
 set -euo pipefail
 
@@ -14,14 +16,13 @@ root=$(cd "${here}/../../.." && pwd)
 work=$(realpath -m "${WORK_DIR:-${root}/build/missions}")
 moos_ivp=${work}/moos-ivp
 
-# A copy, so that building leaves the submodule clean
 if [ ! -x "${moos_ivp}/ivp/bin/pHelmIvP" ]; then
     rm -rf "${moos_ivp}"
-    mkdir -p "${moos_ivp}"
-    git -C "${root}/external/moos-ivp" archive HEAD | tar -x -C "${moos_ivp}"
+    git clone --depth 1 --branch "${MOOS_IVP_BRANCH:-ivp-without-moos}" \
+        https://github.com/GobySoft/moos-ivp.git "${moos_ivp}"
     (cd "${moos_ivp}" && ./build-moos.sh --minrobot ${MOOS_BUILD_ARGS:-} && ./build-ivp.sh --nogui)
 fi
-export PATH="${moos_ivp}/ivp/bin:${moos_ivp}/build/MOOS/MOOSCore/bin:${moos_ivp}/build/MOOS/MOOSEssentials/bin:${PATH}"
+export PATH="${moos_ivp}/ivp/bin:${moos_ivp}/bin:${moos_ivp}/build/MOOS/MOOSCore/bin:${moos_ivp}/build/MOOS/MOOSEssentials/bin:${PATH}"
 
 # Keeps the log header, pHelmIvP's posts, and every post to a variable pHelmIvP
 # registered, without the duplicate lines pLogger sometimes writes
