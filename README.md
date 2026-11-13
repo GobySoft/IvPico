@@ -51,4 +51,4 @@ Contacts come in as `Navigation` with `self: false`, or as `NODE_REPORT` variabl
 
 ## License
 
-The libraries (`src/lib`) are LGPL 2.1 or later, and the binaries and tests (`src/bin`, `src/test`) are GPL 2 or later. `src/lib/helm/helm.cpp`, which ports pHelmIvP's logic, is GPL 3 or later, as is MOOS-IvP, whose helm libraries IvPico links. See [COPYING](COPYING).
+The libraries (`src/lib`) are LGPL 2.1 or later, and the binaries and tests (`src/bin`, `src/test`) are GPL 2 or later. The helm's ports of pHelmIvP and pContactMgrV20 (`src/lib/helm/helm.cpp`, `contact_manager.{h,cpp}` and `contacts/`) are GPL 3 or later, as is MOOS-IvP, whose helm libraries IvPico links. See [COPYING](COPYING).
