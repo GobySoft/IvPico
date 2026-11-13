@@ -61,10 +61,15 @@ fi
 apt_install libopenocean-messages-dev libivp-helm-dev
 
 if ${goby}; then
-    # Goby3, for src/bin/goby. If apt doesn't have it yet, add packages.gobysoft.org's
-    # continuous builds, which have 'goby test' (newer than 3.6.1)
-    goby_policy=$(apt-cache policy libgoby3-dev)
-    if ! grep -q "Candidate: [^(]" <<< "${goby_policy}"; then
+    # libgoby3-dev only recommends libais-dev and dccl5-compiler, but goby's CMake package
+    # links libais.so, and goby_add_app() runs protoc-gen-dccl. MOOS-IvP's apps
+    # (pMarineViewer for the Goby launches) need libmoos-ivp but don't depend on it
+    goby_packages=(libgoby3-dev goby3-apps libais-dev dccl5-compiler
+        libgoby3-moos-dev goby3-moos moosdb10 moos-ivp-apps moos-ivp-gui libmoos-ivp)
+    # If apt can't install them yet, add packages.gobysoft.org's continuous builds, which
+    # have 'goby test' (newer than 3.6.1), pinned over another source's Goby3 whose
+    # dependencies may not be available
+    if ! apt-get -s install "${goby_packages[@]}" > /dev/null 2>&1; then
         apt_install curl gpg
         keyring=/usr/share/keyrings/gobysoft-archive-keyring.gpg
         if [ ! -f "${keyring}" ]; then
@@ -73,12 +78,9 @@ if ${goby}; then
         fi
         echo "deb [signed-by=${keyring}] http://packages.gobysoft.org/${ID}/continuous/ ${VERSION_CODENAME}/" |
             $SUDO tee /etc/apt/sources.list.d/gobysoft_continuous.list > /dev/null
+        printf "Package: *\nPin: origin packages.gobysoft.org\nPin-Priority: 600\n" |
+            $SUDO tee /etc/apt/preferences.d/gobysoft_continuous > /dev/null
         $SUDO apt-get update
     fi
-    # libgoby3-dev only recommends these, but goby's CMake package links libais.so,
-    # and goby_add_app() runs protoc-gen-dccl
-    apt_install libgoby3-dev goby3-apps libais-dev dccl5-compiler
-    # pMarineViewer for the Goby launches (viewer.launch), through goby_moos_gateway;
-    # MOOS-IvP's apps need libmoos-ivp but don't depend on it
-    apt_install libgoby3-moos-dev goby3-moos moosdb10 moos-ivp-apps moos-ivp-gui libmoos-ivp
+    apt_install "${goby_packages[@]}"
 fi
