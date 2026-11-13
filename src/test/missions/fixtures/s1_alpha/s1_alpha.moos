@@ -1,7 +1,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% LOG FILE:       ./MOOSLog_27_10_2026_____06_56_17/MOOSLog_27_10_2026_____06_56_17._moos
+%% LOG FILE:       ./MOOSLog_13_11_2026_____03_36_39/MOOSLog_13_11_2026_____03_36_39._moos
 %% FILE OPENED ON  Thu Jan  1 00:00:00 1970
-%% LOGSTART           17930841772.21312
+%% LOGSTART           17945409993.54647
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //-------------------------------------------------
 // NAME: M. Benjamin, MIT CSAIL
@@ -31,7 +31,7 @@ ProcessConfig = ANTLER
   MSBetweenLaunches = 200
 
   Run = MOOSDB        @ NewConsole = false
-  Run = pLogger       @ NewConsole = false
+  Run = pLogger @ NewConsole = false
   Run = uSimMarineV22 @ NewConsole = false
   Run = pMarinePIDV22 @ NewConsole = false
   Run = pHelmIvP      @ NewConsole = false
@@ -92,6 +92,7 @@ ProcessConfig = pLogger
   Log = IVPHELM_TOTAL_PCS_CACHED @ 0 NOSYNC
   Log = IVPHELM_TOTAL_PCS_FORMED @ 0 NOSYNC
   Log = IVPHELM_UPDATEVARS @ 0 NOSYNC
+  Log = MISSION @ 0 NOSYNC
   Log = MOOS_DEBUG @ 0 NOSYNC
   Log = MOOS_MANUAL_OVERIDE @ 0 NOSYNC
   Log = MOOS_MANUAL_OVERRIDE @ 0 NOSYNC
@@ -142,9 +143,6 @@ ProcessConfig = pLogger
 
   LogAuxSrc = true
   WildCardLogging = true
-  WildCardOmitPattern = *_STATUS
-  WildCardOmitPattern = DB_VARSUMMARY
-  WildCardOmitPattern = DB_RWSUMMARY
   WildCardExclusionLog = true
 }
 
@@ -308,8 +306,9 @@ ProcessConfig = pNodeReporter
 
 ProcessConfig = uTimerScript_record
 {
-  event = var=DEPLOY, val=true, time=10
-  event = var=MOOS_MANUAL_OVERRIDE, val=false, time=10
+  condition = (IVPHELM_STATE = PARK) or (IVPHELM_STATE = DRIVE)
+  event = var=DEPLOY, val=true, time=5
+  event = var=MOOS_MANUAL_OVERRIDE, val=false, time=5
 }
 
 
