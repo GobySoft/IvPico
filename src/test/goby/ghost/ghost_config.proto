@@ -1,0 +1,33 @@
+// Copyright 2026:
+//   GobySoft, LLC
+//
+// This file is part of IvPico.
+//
+// IvPico is free software: you can redistribute it and/or modify it under the
+// terms of the GNU General Public License as published by the Free Software
+// Foundation, either version 2 of the License, or (at your option) any later
+// version.
+//
+// IvPico is distributed in the hope that it will be useful, but WITHOUT ANY
+// WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with IvPico. If not, see <https://www.gnu.org/licenses/>.
+
+syntax = "proto2";
+
+import "goby/middleware/protobuf/app_config.proto";
+import "goby/zeromq/protobuf/interprocess_config.proto";
+import "goby/protobuf/option_extensions.proto";
+
+package ivpico.goby.protobuf;
+
+message GhostConfig
+{
+    optional .goby.middleware.protobuf.AppConfig app = 1;
+    optional .goby.zeromq.protobuf.InterProcessPortalConfig interprocess = 2;
+
+    required string alog = 10 [(.goby.field).description = "xz-compressed alog with the contacts' NODE_REPORTs"];
+    repeated string vehicle = 11 [(.goby.field).description = "Contacts to replay (NODE_REPORT NAME)"];
+}

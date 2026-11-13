@@ -2,7 +2,7 @@
 // ivpico::helm::Helm, and checks that the helm makes the same decisions and
 // posts the same things.
 //
-// Usage: replay <fixture directory> [stream to print in full, e.g. "loiter LOITER_INDEX"]
+// Usage: replay <fixture directory> [--alerts] [stream to print in full, e.g. "loiter LOITER_INDEX"]
 //
 // The fixture holds the vehicle's .moos file (for pHelmIvP's configuration),
 // its .bhv files, and an alog trimmed to pHelmIvP's posts and the posts to
@@ -33,6 +33,15 @@
 // domain on all but `desired_max_mismatch` of the iterations where either
 // helm decided, and never off for more than `desired_max_run` in a row.
 //
+// Contacts are replayed two ways:
+//  - by default, the recorded contact manager's posts (pContactMgrV20's alerts,
+//    BHV_ABLE_FILTER) go in like any other input, and the helm's own contact
+//    alerts are off (contact_alerts: false). This checks the helm alone;
+//  - with --alerts, those posts are left out, and the helm raises alerts
+//    itself from the .moos file's pContactMgrV20 block. Its posts are compared
+//    with pContactMgrV20's, and every change may be `alerts_tolerance`
+//    iterations off, since pContactMgrV20 iterates on its own clock.
+//
 // Prints a summary per stream, the first mismatches in each, and exits non-zero
 // if any stream failed.
 
@@ -60,7 +69,8 @@ using ivpico::helm::Output;
 
 namespace
 {
-constexpr int tolerance = 1;
+int tolerance = 1;
+constexpr int alerts_tolerance = 2;
 constexpr double mail_latency = 0.005;
 constexpr double number_tolerance = 1e-3;
 constexpr double max_mismatch = 0.05;
@@ -143,13 +153,94 @@ Alog read_alog(const fs::path& path)
     return alog;
 }
 
-// pHelmIvP's block of the .moos file, as HelmConfig
+bool is_contact_manager(const std::string& source)
+{
+    return source.rfind("pContactMgrV20", 0) == 0;
+}
+
+// pContactMgrV20's block of the .moos file
+void read_contact_manager(const std::vector<std::string>& lines, HelmConfig::ContactManager& cm)
+{
+    // in reverse, as MOOS's mission reader hands them over
+    for (auto it = lines.rbegin(); it != lines.rend(); ++it)
+    {
+        const std::string& line = *it;
+        const auto eq = line.find('=');
+        const std::string key = lower(trim(line.substr(0, eq)));
+        const std::string value = eq == std::string::npos ? "" : trim(line.substr(eq + 1));
+        const bool truth = lower(value) == "true";
+        if (key == "alert")
+            cm.add_alert(value);
+        else if (key == "ignore_name")
+            cm.add_ignore_name(value);
+        else if (key == "match_name")
+            cm.add_match_name(value);
+        else if (key == "ignore_group")
+            cm.add_ignore_group(value);
+        else if (key == "match_group")
+            cm.add_match_group(value);
+        else if (key == "ignore_type")
+            cm.add_ignore_type(value);
+        else if (key == "match_type")
+            cm.add_match_type(value);
+        else if (key == "ignore_region")
+            cm.add_ignore_region(value);
+        else if (key == "match_region")
+            cm.add_match_region(value);
+        else if (key == "strict_ignore")
+            cm.set_strict_ignore(truth);
+        else if (key == "ownship_group")
+            cm.set_ownship_group(value);
+        else if (key == "ownship_type")
+            cm.set_ownship_type(value);
+        else if (key == "contact_max_age")
+            cm.set_contact_max_age(std::stod(value));
+        else if (key == "reject_range")
+            cm.set_reject_range(lower(value) == "off" ? 0 : std::stod(value));
+        else if (key == "max_contacts")
+            cm.set_max_contacts(std::stoul(value));
+        else if (key == "decay")
+        {
+            const auto comma = value.find(',');
+            cm.set_decay_start(std::stod(value.substr(0, comma)));
+            cm.set_decay_end(std::stod(value.substr(comma + 1)));
+        }
+        else if (key == "hold_alerts_for_helm")
+            cm.set_hold_alerts_for_helm(truth);
+        else if (key == "alert_verbose")
+            cm.set_alert_verbose(truth);
+        else if (key == "disable_var")
+            cm.set_disable_var(value);
+        else if (key == "enable_var")
+            cm.set_enable_var(value);
+        else if (key == "expunge_var")
+            cm.set_expunge_var(value);
+        else if (key == "able_flag")
+            cm.add_able_flag(value);
+        else if (key == "disable_flag")
+            cm.add_disable_flag(value);
+        else if (key == "enable_flag")
+            cm.add_enable_flag(value);
+        else if (key == "early_warning_time")
+            cm.set_early_warning_time(std::stod(value));
+        else if (key == "early_warning_flag")
+            cm.add_early_warning_flag(value);
+        else if (key == "cease_warning_flag")
+            cm.add_cease_warning_flag(value);
+        else if (key == "retire_flag")
+            cm.add_retire_flag(value);
+        else if (key != "apptick" && key != "commstick")
+            std::cout << "  (pContactMgrV20 parameter not replayed: " << line << ")\n";
+    }
+}
+
+// pHelmIvP's (and pContactMgrV20's) blocks of the .moos file, as HelmConfig
 HelmConfig read_config(const fs::path& moos_file, const fs::path& dir)
 {
     HelmConfig cfg;
     std::ifstream in(moos_file);
-    bool in_block = false, in_helm = false;
-    std::vector<std::string> helm_lines;
+    bool in_block = false, in_helm = false, in_cm = false;
+    std::vector<std::string> helm_lines, cm_lines;
     for (std::string line; std::getline(in, line);)
     {
         line = trim(line.substr(0, line.find("//")));
@@ -164,6 +255,7 @@ HelmConfig read_config(const fs::path& moos_file, const fs::path& dir)
         if (key == "processconfig")
         {
             in_helm = value == "pHelmIvP";
+            in_cm = value == "pContactMgrV20";
             continue;
         }
         if (line == "{")
@@ -173,12 +265,15 @@ HelmConfig read_config(const fs::path& moos_file, const fs::path& dir)
         }
         if (line == "}")
         {
-            in_block = in_helm = false;
+            in_block = in_helm = in_cm = false;
             continue;
         }
         if (in_block && in_helm)
             helm_lines.push_back(line);
+        if (in_block && in_cm)
+            cm_lines.push_back(line);
     }
+    read_contact_manager(cm_lines, *cfg.mutable_contact_manager());
 
     // MOOS's mission reader hands pHelmIvP its configuration in reverse order,
     // which sets the order of the domain variables
@@ -440,12 +535,20 @@ bool compare_desired(const std::string& var, double step, bool wrap,
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2 && argc != 3)
+    std::vector<std::string> args(argv + 1, argv + argc);
+    const auto alerts_arg = std::find(args.begin(), args.end(), "--alerts");
+    const bool alerts = alerts_arg != args.end();
+    if (alerts)
+        args.erase(alerts_arg);
+    if (args.size() != 1 && args.size() != 2)
     {
-        std::cerr << "usage: replay <fixture directory> [stream to print in full]\n";
+        std::cerr << "usage: replay <fixture directory> [--alerts] [stream to print in full]\n";
         return 2;
     }
-    const fs::path dir = fs::path(argv[1]).lexically_normal();
+    const std::string print_stream = args.size() == 2 ? args[1] : "";
+    if (alerts)
+        tolerance = alerts_tolerance;
+    const fs::path dir = fs::path(args[0]).lexically_normal();
     fs::path moos_file, alog_file;
     for (const auto& f : fs::directory_iterator(dir))
     {
@@ -456,9 +559,10 @@ int main(int argc, char* argv[])
             alog_file = f.path();
     }
     std::cout << "Replaying " << (dir.has_filename() ? dir : dir.parent_path()).filename().string()
-              << "\n";
+              << (alerts ? " with the helm's own contact alerts" : "") << "\n";
 
-    const HelmConfig cfg = read_config(moos_file, dir);
+    HelmConfig cfg = read_config(moos_file, dir);
+    cfg.set_contact_alerts(alerts);
     const Alog alog = read_alog(alog_file);
 
     auto is_helm = [](const Entry& e) { return e.source.rfind("pHelmIvP", 0) == 0; };
@@ -476,11 +580,18 @@ int main(int argc, char* argv[])
                                1);
     };
 
+    std::map<std::string, bool> registered;
+    for (const auto& e : alog.entries)
+        if (is_helm(e) && e.var == "IVPHELM_REGISTER")
+            registered[e.value] = true;
+
     // pHelmIvP's side
     Streams moos;
     std::map<std::string, std::map<int, double>> moos_desired;
     for (const auto& e : alog.entries)
     {
+        if (alerts && is_contact_manager(e.source))
+            add_change(moos, "contact_manager " + e.var, tick_of(e.time), e.value);
         if (!is_helm(e))
             continue;
         const int k = tick_of(e.time);
@@ -521,7 +632,7 @@ int main(int argc, char* argv[])
              ++next_input)
         {
             const Entry& e = alog.entries[next_input];
-            if (is_helm(e))
+            if (is_helm(e) || (alerts && is_contact_manager(e.source)))
                 continue;
             ivp::interface::Variable v;
             v.set_time(static_cast<int64_t>((alog.logstart + e.time) * 1e6));
@@ -563,6 +674,11 @@ int main(int argc, char* argv[])
                 case ivp::interface::Posting::BEHAVIOR:
                     add_change(ivpico, p.behavior() + " " + p.key(), tick, value);
                     break;
+                // the recording has only the posts to variables pHelmIvP registered
+                case ivp::interface::Posting::CONTACT_MANAGER:
+                    if (registered.count(p.key()))
+                        add_change(ivpico, "contact_manager " + p.key(), tick, value);
+                    break;
                 default: break;
             }
         }
@@ -602,12 +718,14 @@ int main(int argc, char* argv[])
     for (const auto& [name, changes] : ivpico) names[name] = true;
     for (const auto& [name, unused] : names) ok = compare(name, moos[name], ivpico[name]) && ok;
 
-    if (argc == 3)
+    if (!print_stream.empty())
     {
-        std::cout << "pHelmIvP " << argv[2] << ":\n";
-        for (const auto& c : moos[argv[2]]) std::cout << "  " << c.tick << " " << c.value << "\n";
-        std::cout << "IvPico " << argv[2] << ":\n";
-        for (const auto& c : ivpico[argv[2]]) std::cout << "  " << c.tick << " " << c.value << "\n";
+        std::cout << "pHelmIvP " << print_stream << ":\n";
+        for (const auto& c : moos[print_stream])
+            std::cout << "  " << c.tick << " " << c.value << "\n";
+        std::cout << "IvPico " << print_stream << ":\n";
+        for (const auto& c : ivpico[print_stream])
+            std::cout << "  " << c.tick << " " << c.value << "\n";
     }
 
     std::map<std::string, bool> desired_vars;

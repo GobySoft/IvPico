@@ -2,7 +2,8 @@
 # Records MOOS-IvP missions under pHelmIvP for the replay tests: builds all of
 # MOOS-IvP from GobySoft's ivp-without-moos branch (libivp-helm-dev's source),
 # runs each mission in missions.txt headless, and keeps each vehicle's helm
-# inputs and outputs in fixtures/<mission>.
+# inputs and outputs in fixtures/<mission> (one vehicle) or
+# fixtures/<mission>.<vehicle> (missions started by launch.sh).
 #
 # Usage: record.sh [mission...]   (default: every mission in missions.txt)
 #
@@ -25,10 +26,13 @@ fi
 export PATH="${moos_ivp}/ivp/bin:${moos_ivp}/bin:${moos_ivp}/build/MOOS/MOOSCore/bin:${moos_ivp}/build/MOOS/MOOSEssentials/bin:${PATH}"
 
 # Keeps the log header, pHelmIvP's posts, and every post to a variable pHelmIvP
-# registered, without the duplicate lines pLogger sometimes writes
+# registered, without the duplicate lines pLogger sometimes writes, its
+# app logging, the objective functions (which replay doesn't compare), or the
+# lines a multi-line value spills onto
 trim() {
     awk 'NR == FNR { if ($2 == "IVPHELM_REGISTER") registered[$4] = 1; next }
          /^%%/ { print; next }
+         $1 !~ /^-?[0-9.]+$/ || $2 ~ /^(APP_LOG|APPCAST|PHELMIVP_STATUS|BHV_IPF)$/ { next }
          ($3 ~ /^pHelmIvP/ || ($2 in registered)) && !seen[$0]++' "$1" "$1"
 }
 
@@ -60,6 +64,12 @@ prepare() {
     mv "${moos_file}.prepared" "${moos_file}"
 }
 
+# Drops a shoreside's GUIs, which a headless run can't start
+strip_gui() {
+    awk '!/^[ \t]*Run *= *(pMarineViewer|uMAC)[ \t@]/' "$1" > "$1.headless"
+    mv "$1.headless" "$1"
+}
+
 # The log directories of a run, wherever its pLogger writes them
 log_dirs() {
     find "$1" -name '*.alog' -exec dirname {} \; | sort -u
@@ -87,7 +97,9 @@ add_logging() {
     mv "${moos_file}.logged" "${moos_file}"
 }
 
-# run <directory> <moos file> <warp> <seconds> [log variables]
+# run <directory> <moos file, or launch.sh> <warp> <seconds> [log variables]
+# With launch.sh, the mission's own launch.sh writes a .moos file per community
+# (targ_*.moos), and each one runs.
 run() {
     local run=$1 moos_file=$2 warp=$3 seconds=$4 variables=${5:-}
     rm -rf "${run}"
@@ -95,20 +107,40 @@ run() {
     cp -r "${moos_ivp}/ivp/missions/${mission}" "${run}"
     (
         cd "${run}"
-        prepare "${moos_file}" "${pokes[@]}"
-        [ -n "${variables}" ] && add_logging "${moos_file}" "${variables}"
-        # job control puts pAntler in its own process group, to stop whatever it leaves behind
+        local moos_files=("${moos_file}")
+        if [ "${moos_file}" = launch.sh ]; then
+            ./launch.sh --just_make "${warp}" > launch.log 2>&1
+            moos_files=(targ_*.moos)
+        fi
+        local f
+        for f in "${moos_files[@]}"; do
+            if grep -qiE '^[[:space:]]*processconfig[[:space:]]*=[[:space:]]*phelmivp' "${f}"; then
+                prepare "${f}" "${pokes[@]}"
+                [ -n "${variables}" ] && add_logging "${f}" "${variables}"
+            else
+                strip_gui "${f}"
+            fi
+        done
+        # job control puts each pAntler in its own process group, to stop whatever it leaves behind
         set -m
-        pAntler "${moos_file}" --MOOSTimeWarp="${warp}" > antler.log 2>&1 &
-        antler=$!
+        local antlers=()
+        for f in "${moos_files[@]}"; do
+            pAntler "${f}" --MOOSTimeWarp="${warp}" > "antler_${f%.moos}.log" 2>&1 &
+            antlers+=($!)
+        done
         sleep $((seconds / warp))
-        kill -INT "${antler}"
+        local antler
+        for antler in "${antlers[@]}"; do kill -INT "${antler}" 2> /dev/null || true; done
         for _ in $(seq 20); do
-            kill -0 "${antler}" 2> /dev/null || break
+            local running=0
+            for antler in "${antlers[@]}"; do kill -0 "${antler}" 2> /dev/null && running=1; done
+            [ "${running}" = 0 ] && break
             sleep 1
         done
-        kill -KILL -- "-${antler}" 2> /dev/null || true
-        wait "${antler}" || true
+        for antler in "${antlers[@]}"; do
+            kill -KILL -- "-${antler}" 2> /dev/null || true
+            wait "${antler}" || true
+        done
     )
 }
 
@@ -126,17 +158,24 @@ record() {
     variables=$(helm_variables "${logs[@]}" | tr '\n' ' ')
     run "${work}/runs/${mission}" "${moos_file}" "${warp}" "${seconds}" "${variables}"
 
-    local fixture=${here}/fixtures/${mission}
-    rm -rf "${fixture}"
-    mkdir -p "${fixture}"
+    rm -rf "${here}/fixtures/${mission}" "${here}/fixtures/${mission}".*
     local log
     for log in $(log_dirs "${work}/runs/${mission}"); do
-        local name
+        local name community fixture
         name=$(basename "${log}")
-        trim "${log}/${name}.alog" | xz -9 > "${fixture}/${mission}.alog.xz"
-        cp "${log}/${name}._moos" "${fixture}/${mission}.moos"
-        if ! xz -dc "${fixture}/${mission}.alog.xz" | grep "IVPHELM_REGISTER" > /dev/null; then
-            echo "warning: ${mission}'s log misses pHelmIvP's startup" >&2
+        awk '$2 == "IVPHELM_STATE" && $3 ~ /^pHelmIvP/ { found = 1; exit } END { exit !found }' \
+            "${log}/${name}.alog" || continue
+        community=$(awk -F= 'tolower($1) ~ /^[ \t]*community[ \t]*$/ { gsub(/[ \t]/, "", $2); print $2; exit }' \
+            "${log}/${name}._moos")
+        fixture=${here}/fixtures/${mission}
+        [ "${moos_file}" = launch.sh ] && fixture+=".${community}"
+        mkdir -p "${fixture}"
+        local base
+        base=$(basename "${fixture}")
+        trim "${log}/${name}.alog" | xz -9 > "${fixture}/${base}.alog.xz"
+        cp "${log}/${name}._moos" "${fixture}/${base}.moos"
+        if ! xz -dc "${fixture}/${base}.alog.xz" | grep "IVPHELM_REGISTER" > /dev/null; then
+            echo "warning: ${base}'s log misses pHelmIvP's startup" >&2
         fi
         for bhv in "${log}"/*._bhv; do
             [ -e "${bhv}" ] || continue
@@ -144,7 +183,11 @@ record() {
         done
         # pHelmIvP only asks pLogger to copy its behavior files once it has started
         if ! ls "${fixture}"/*.bhv > /dev/null 2>&1; then
-            cp "${work}/runs/${mission}"/*.bhv "${fixture}/"
+            if [ "${moos_file}" = launch.sh ]; then
+                cp "${work}/runs/${mission}/targ_${community}.bhv" "${fixture}/"
+            else
+                cp "${work}/runs/${mission}"/*.bhv "${fixture}/"
+            fi
         fi
     done
 }

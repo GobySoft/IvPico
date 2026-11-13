@@ -13,20 +13,27 @@ foreach(fixture ${fixtures})
   if(IS_DIRECTORY ${fixture})
     get_filename_component(mission ${fixture} NAME)
     add_test(NAME replay_${mission} COMMAND replay ${fixture})
+    file(GLOB moos_file ${fixture}/*.moos)
+    file(STRINGS ${moos_file} contact_manager REGEX "ProcessConfig *= *pContactMgrV20")
+    if(contact_manager)
+      add_test(NAME replay_${mission}_alerts COMMAND replay ${fixture} --alerts)
+    endif()
   endif()
 endforeach()
 
 # 'goby test' is in Goby builds after 3.6.1, which set GOBY_EXECUTABLE
 if(GOBY_FOUND AND GOBY_EXECUTABLE)
+  add_subdirectory(goby/ghost)
   set(goby_test_defines
-    -D HELM=$<TARGET_FILE:goby_helm_ivp> -D INTERFACE_LIB=$<TARGET_FILE:ivpico_interface>)
+    -D HELM=$<TARGET_FILE:goby_helm_ivp> -D INTERFACE_LIB=$<TARGET_FILE:ivpico_interface>
+    -D GHOST=$<TARGET_FILE:ivpico_ghost>)
 
   add_test(NAME goby_helm_ivp
     COMMAND ${GOBY_EXECUTABLE} test run ${CMAKE_CURRENT_SOURCE_DIR}/goby/helm_ivp/test.yml
             ${goby_test_defines})
 
   set(simulator_port 54400)
-  foreach(mission s1_alpha s2_bravo s3_charlie s4_delta)
+  foreach(mission s1_alpha s2_bravo s3_charlie s4_delta m2_berta)
     add_test(NAME closed_loop_${mission}
       COMMAND ${GOBY_EXECUTABLE} test run ${CMAKE_CURRENT_SOURCE_DIR}/missions/goby/${mission}/test.yml
               ${goby_test_defines} -D MISSION=${mission} -D PORT=${simulator_port})
