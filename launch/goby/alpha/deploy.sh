@@ -3,7 +3,10 @@
 set -euo pipefail
 
 export GOBY_INTERPROCESS='platform: "alpha"'
-export GOBY_TOOL_LOAD_SHARED_LIBRARY=${GOBY_TOOL_LOAD_SHARED_LIBRARY:-libivpico_interface.so}
+# IvPico's build (build.sh), or else an installed libivpico_interface.so
+lib=$(dirname "$0")/../../../build/usr/lib/libivpico_interface.so
+[ -f "${lib}" ] || lib=libivpico_interface.so
+export GOBY_TOOL_LOAD_SHARED_LIBRARY=${GOBY_TOOL_LOAD_SHARED_LIBRARY:-${lib}}
 
 goby zeromq publish ivpico::helm::variable PROTOBUF/ivp.interface.Variable 'key: "DEPLOY" sval: "true"'
 goby zeromq publish ivpico::helm::command PROTOBUF/ivp.interface.Command 'manual_override: false'

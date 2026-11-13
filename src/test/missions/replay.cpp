@@ -736,6 +736,7 @@ int main(int argc, char* argv[])
             reports.push_back(&e);
 
     size_t next_input = 0, next_report = 0;
+    auto previous_allstop = ivp::interface::ALLSTOP_UNKNOWN;
     for (size_t k = 0; k < ticks.size(); ++k)
     {
         for (; next_input < alog.entries.size() &&
@@ -755,6 +756,8 @@ int main(int argc, char* argv[])
 
         const Output& out = helm.iterate(alog.logstart + ticks[k]);
         const int tick = static_cast<int>(k);
+        const bool allstop_changed = out.status.allstop() != previous_allstop;
+        previous_allstop = out.status.allstop();
         add_change(ivpico, "IVPHELM_STATE", tick, Status::State_Name(out.status.state()));
         if (out.status.allstop() != ivp::interface::ALLSTOP_UNKNOWN)
             add_change(ivpico, "IVPHELM_ALLSTOP", tick, ivpico::helm::allstop_string(out.status));
@@ -813,7 +816,11 @@ int main(int argc, char* argv[])
             const std::string type = lower(ivp::interface::LifeEvent::Type_Name(e.type()));
             ivpico["IVPHELM_LIFE_EVENT"].push_back({tick, type + " " + e.behavior()});
         }
-        if (out.solution)
+        // pHelmIvP posts an allstop's zero DESIRED_* only on the iteration the allstop
+        // changes (and, after an iteration's grace, never for one with no decisions),
+        // relying on pMarinePID to stop when they go stale. The helm repeats its zero
+        // solution every iteration of an allstop, so only the change is compared.
+        if (out.solution && (out.solution->allstop() == ivp::interface::CLEAR || allstop_changed))
         {
             const auto& d = out.solution->desired();
             if (d.has_attitude() && d.attitude().has_heading())

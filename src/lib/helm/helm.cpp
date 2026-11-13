@@ -1122,43 +1122,47 @@ void Helm::Impl::post_decisions()
     output_.solution = solution;
 }
 
-// HelmIvP::postAllStop
+// HelmIvP::postAllStop, but the zero solution goes out every iteration of an allstop:
+// a frontseat holds its last command, where pMarinePID stops on stale DESIRED_*
 void Helm::Impl::post_allstop(const std::string& msg)
 {
-    if (!enabled() || msg == allstop_msg_)
+    if (!enabled())
         return;
 
-    allstop_msg_ = msg;
-    allstop_reason_ = msg;
-    no_decisions_ =
-        (msg == "NothingToDo" || msg == "NoGoalBehavior" || strBegins(msg, "MissingDecVars"))
-            ? no_decisions_ + 1
-            : 0;
+    if (msg != allstop_msg_)
+    {
+        allstop_msg_ = msg;
+        allstop_reason_ = msg;
+        no_decisions_ =
+            (msg == "NothingToDo" || msg == "NoGoalBehavior" || strBegins(msg, "MissingDecVars"))
+                ? no_decisions_ + 1
+                : 0;
 
-    notify("IVPHELM_ALLSTOP", msg);
-    if (msg == "clear")
+        notify("IVPHELM_ALLSTOP", msg);
+        if (msg == "clear")
+            return;
+
+        // one iteration's grace to let the helm move between modes
+        if (no_decisions_ == 1)
+            return;
+
+        // other allstops keep control, and the helm decides again once they clear
+        if (allow_park_ && park_on_allstop_ &&
+            (msg == "BehaviorError" || msg == "DisabledByStandbyHelm"))
+            has_control_ = false;
+
+        for (unsigned i = 0; i < domain_.size(); ++i)
+            notify(desired_variable(domain_.getVarName(i)), 0.0);
+    }
+    else if (msg == "clear")
         return;
-
-    // one iteration's grace to let the helm move between modes
-    if (no_decisions_ == 1)
-        return;
-
-    // other allstops keep control, and the helm decides again once they clear
-    if (allow_park_ && park_on_allstop_ &&
-        (msg == "BehaviorError" || msg == "DisabledByStandbyHelm"))
-        has_control_ = false;
 
     ivp::interface::Solution solution;
     solution.set_allstop(allstop_enum(msg));
     solution.set_iteration(iteration_);
     auto& desired = *solution.mutable_desired();
     desired.set_time(micros(curr_time_));
-    for (unsigned i = 0; i < domain_.size(); ++i)
-    {
-        const std::string var = domain_.getVarName(i);
-        set_desired(desired, var, 0);
-        notify(desired_variable(var), 0.0);
-    }
+    for (unsigned i = 0; i < domain_.size(); ++i) set_desired(desired, domain_.getVarName(i), 0);
     output_.solution = solution;
 }
 

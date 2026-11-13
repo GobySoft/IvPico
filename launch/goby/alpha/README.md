@@ -22,15 +22,14 @@ From the top of IvPico, after `./build.sh`:
 
 ```
 export PATH=$PWD/build/usr/bin:$PATH
-export GOBY_TOOL_LOAD_SHARED_LIBRARY=$PWD/build/usr/lib/libivpico_interface.so
 cd launch/goby/alpha
 goby_launch alpha.launch
 ./deploy.sh
 ```
 
-`deploy.sh` publishes DEPLOY=true and lifts the manual override with `goby zeromq publish`, which can publish any other `Variable` or `Command` the same way.
+`deploy.sh` publishes DEPLOY=true and lifts the manual override with `goby zeromq publish`, which can publish any other `Variable` or `Command` the same way, with `GOBY_TOOL_LOAD_SHARED_LIBRARY` set to IvPico's `build/usr/lib/libivpico_interface.so`.
 
-As in MOOS-IvP's alpha, the helm parks when the survey is done (pHelmIvP's `park_on_allstop`); deploy again to return.
+As in MOOS-IvP's alpha, the vehicle surveys, returns, and stops at the return point; deploy again to repeat.
 
 ## Viewing in Liaison
 

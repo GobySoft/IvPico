@@ -745,7 +745,9 @@ Behavior = BHV_ConstantHeading
         Helm helm(cfg);
         Vehicle vehicle;
         double t = t0;
-        bool missing = false, solution = false;
+        // After one iteration's grace, every iteration of the allstop has a zero solution
+        bool missing = false, clear = false, held = false;
+        int missing_iterations = 0;
         for (int i = 0; i < 12; ++i)
         {
             helm.handle(vehicle.navigation(t));
@@ -753,13 +755,21 @@ Behavior = BHV_ConstantHeading
             if (out.status.allstop() == ivp::interface::MISSING_DECISION_VARIABLES &&
                 out.status.missing_decision_variables_size() == 1 &&
                 out.status.missing_decision_variables(0) == "speed")
+            {
                 missing = true;
-            if (out.solution)
-                solution = true;
+                if (++missing_iterations > 1 &&
+                    !(out.solution &&
+                      out.solution->allstop() == ivp::interface::MISSING_DECISION_VARIABLES &&
+                      out.solution->desired().speed().value() == 0))
+                    held = true;
+            }
+            if (out.solution && out.solution->allstop() == ivp::interface::CLEAR)
+                clear = true;
             t += dt;
         }
         check(missing, scenario, "no MISSING_DECISION_VARIABLES for speed");
-        check(!solution, scenario, "a solution without a speed decision");
+        check(!clear, scenario, "a CLEAR solution without a speed decision");
+        check(!held, scenario, "an iteration of the allstop without a zero solution");
         check(helm.state() == Status::DRIVE, scenario, "parked on a missing decision");
     }
     {
@@ -786,6 +796,63 @@ Behavior = BHV_ConstantHeading
         check(clear, scenario, "no CLEAR solution with speed optional");
         check(overridden, scenario, "manual override didn't PARK with MANUAL_OVERRIDE");
     }
+}
+
+// The mission ends as alpha's does: the only behavior completes, leaving
+// NothingToDo. pHelmIvP posts no DESIRED_* from then on, relying on pMarinePID
+// to stop on stale input; a frontseat holds its last command instead, so the
+// helm must keep commanding zero speed. After one iteration's grace, every
+// iteration should have a NOTHING_TO_DO solution with speed 0.
+void mission_end()
+{
+    const std::string scenario = "mission_end";
+    auto cfg = config(write_bhv(scenario, R"(
+Behavior = BHV_ConstantSpeed
+{
+  name     = cs
+  speed    = 2
+  duration = 2
+}
+
+Behavior = BHV_ConstantHeading
+{
+  name     = ch
+  heading  = 90
+  duration = 2
+}
+)"));
+    cfg.set_start_in_drive(true);
+    Helm helm(cfg);
+    check(helm.config_warnings().empty(), scenario, "config warnings");
+
+    Vehicle vehicle;
+    double t = t0;
+    bool moving = false;
+    int nothing_iterations = 0, stopped_iterations = 0;
+    for (int i = 0; i < 40; ++i)
+    {
+        helm.handle(vehicle.navigation(t));
+        const Output& out = helm.iterate(t);
+        if (out.solution && out.solution->allstop() == ivp::interface::CLEAR &&
+            out.solution->desired().speed().value() > 1)
+            moving = true;
+        if (out.status.allstop() == ivp::interface::NOTHING_TO_DO)
+        {
+            ++nothing_iterations;
+            if (out.solution && out.solution->allstop() == ivp::interface::NOTHING_TO_DO &&
+                out.solution->desired().speed().value() == 0)
+                ++stopped_iterations;
+        }
+        if (out.solution)
+            vehicle.follow(*out.solution);
+        t += dt;
+    }
+    check(moving, scenario, "never moved before the behaviors completed");
+    check(nothing_iterations > 10, scenario, "never NOTHING_TO_DO after the behaviors completed");
+    check(stopped_iterations == nothing_iterations - 1, scenario,
+          std::to_string(stopped_iterations) + " zero solutions in " +
+              std::to_string(nothing_iterations) + " iterations of NOTHING_TO_DO");
+    check(vehicle.speed == 0, scenario, "still moving at the end");
 }
 
 // A .bhv file with an unknown behavior parameter leaves the helm in MALCONFIG,
@@ -930,6 +997,7 @@ int main()
     restart(true);
     ok_skew();
     allstop();
+    mission_end();
     malconfig();
     deferred_initialize();
     developer_status();

@@ -1,4 +1,4 @@
-# s1_alpha: survey, then return.
+# s1_alpha: survey, return, then stop at the return point.
 # Times are real seconds: a tenth of mission time.
 include: [../closed_loop.yml]
 
@@ -24,15 +24,41 @@ test:
               type: ivp.interface.Posting
               match: 'key: "RETURN" sval: "true"'
               timeout: 46
+        - name: returns home and stops
+          expect:
+            # recorded at 459 s of mission time
+            - group: ivpico::helm::posting
+              type: ivp.interface.Posting
+              match: 'key: "MISSION" sval: "complete"'
+              timeout: 54
+            # waypt_return's point is 0,-20; the vehicle starts at 0,0 and
+            # never stops on the survey
+            - group: goby::middleware::frontseat::node_status
+              type: goby.middleware.frontseat.protobuf.NodeStatus
+              condition:
+                - { field: speed.over_ground, op: LT, value: "0.1" }
+                - { field: local_fix.x, op: GT, value: "-10" }
+                - { field: local_fix.x, op: LT, value: "10" }
+                - { field: local_fix.y, op: GT, value: "-30" }
+                - { field: local_fix.y, op: LT, value: "-10" }
+              timeout: 56
+        - name: stays home
+          expect:
+            # the survey and the return stay east of x = 0
+            - group: goby::middleware::frontseat::node_status
+              type: goby.middleware.frontseat.protobuf.NodeStatus
+              condition: [{ field: local_fix.x, op: LT, value: "-30" }]
+              count: 0
+              timeout: 62
         - name: no errors
           expect:
             - group: ivpico::helm::status
               type: ivp.interface.Status
               condition: [{ field: state, op: EQ, value: MALCONFIG }]
               count: 0
-              timeout: 48
+              timeout: 62
             - group: ivpico::helm::status
               type: ivp.interface.Status
               condition: [{ field: allstop, op: EQ, value: BEHAVIOR_ERROR }]
               count: 0
-              timeout: 48
+              timeout: 62
