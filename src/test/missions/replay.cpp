@@ -491,20 +491,22 @@ bool compare(const std::string& stream, const std::vector<Change>& moos,
             ++i, ++j;
             continue;
         }
-        if (insignificant(moos, i))
+        const auto moos_parts = split_numbers(moos[i].value);
+        const auto ivpico_parts = split_numbers(ivpico[j].value);
+        const bool only_numbers = moos[i].tick == ivpico[j].tick &&
+                                  moos_parts.first == ivpico_parts.first &&
+                                  moos_parts.second.size() == ivpico_parts.second.size();
+        if (!only_numbers && insignificant(moos, i))
         {
             ++i;
             continue;
         }
-        if (insignificant(ivpico, j))
+        if (!only_numbers && insignificant(ivpico, j))
         {
             ++j;
             continue;
         }
-        const auto moos_parts = split_numbers(moos[i].value);
-        const auto ivpico_parts = split_numbers(ivpico[j].value);
-        if (moos[i].tick == ivpico[j].tick && moos_parts.first == ivpico_parts.first &&
-            moos_parts.second.size() == ivpico_parts.second.size())
+        if (only_numbers)
             ++numeric;
         problems.push_back("pHelmIvP iteration " + std::to_string(moos[i].tick) + ": \"" +
                            moos[i].value + "\", IvPico iteration " +
