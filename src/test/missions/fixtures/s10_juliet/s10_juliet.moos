@@ -1,7 +1,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% LOG FILE:       ./JULIET_27_10_2026_____07_50_51/JULIET_27_10_2026_____07_50_51._moos
+%% LOG FILE:       ./JULIET_13_11_2026_____03_49_29/JULIET_13_11_2026_____03_49_29._moos
 %% FILE OPENED ON  Thu Jan  1 00:00:00 1970
-%% LOGSTART           17930874517.89039
+%% LOGSTART           17945417690.33025
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //-------------------------------------------------
 // NAME: M. Benjamin, MIT CSAIL
@@ -54,17 +54,22 @@ ProcessConfig = uProcessWatch
 
 ProcessConfig = pLogger
 {
+  Log = AIS_REPORT @ 0 NOSYNC
+  Log = AIS_REPORT_LOCAL @ 0 NOSYNC
   Log = APPCAST @ 0 NOSYNC
+  Log = BHV_ABLE_FILTER @ 0 NOSYNC
   Log = BHV_IPF @ 0 NOSYNC
   Log = BHV_SETTINGS @ 0 NOSYNC
   Log = BHV_STATUS @ 0 NOSYNC
   Log = BHV_WARNING @ 0 NOSYNC
+  Log = DB_CLIENTS @ 0 NOSYNC
   Log = DEPLOY @ 0 NOSYNC
   Log = DEPTH_VALUE @ 0 NOSYNC
   Log = DESIRED_DEPTH @ 0 NOSYNC
   Log = DESIRED_HEADING @ 0 NOSYNC
   Log = DESIRED_SPEED @ 0 NOSYNC
   Log = GOTO_DEPTH @ 0 NOSYNC
+  Log = HELM_MAP_CLEAR @ 0 NOSYNC
   Log = IVPHELM_ALLSTOP @ 0 NOSYNC
   Log = IVPHELM_BHV_ACTIVE @ 0 NOSYNC
   Log = IVPHELM_BHV_ACTIVE_CNT @ 0 NOSYNC
@@ -85,6 +90,7 @@ ProcessConfig = pLogger
   Log = IVPHELM_LOOP_CPU @ 0 NOSYNC
   Log = IVPHELM_MODESET @ 0 NOSYNC
   Log = IVPHELM_REGISTER @ 0 NOSYNC
+  Log = IVPHELM_REJOURNAL @ 0 NOSYNC
   Log = IVPHELM_STATE @ 0 NOSYNC
   Log = IVPHELM_STATEVARS @ 0 NOSYNC
   Log = IVPHELM_SUMMARY @ 0 NOSYNC
@@ -100,14 +106,19 @@ ProcessConfig = pLogger
   Log = LOITER_REPORT @ 0 NOSYNC
   Log = MODE @ 0 NOSYNC
   Log = MOOS_DEBUG @ 0 NOSYNC
+  Log = MOOS_MANUAL_OVERIDE @ 0 NOSYNC
+  Log = MOOS_MANUAL_OVERRIDE @ 0 NOSYNC
   Log = NAV_DEPTH @ 0 NOSYNC
   Log = NAV_HEADING @ 0 NOSYNC
   Log = NAV_SPEED @ 0 NOSYNC
   Log = NAV_X @ 0 NOSYNC
   Log = NAV_Y @ 0 NOSYNC
+  Log = NODE_REPORT @ 0 NOSYNC
+  Log = NODE_REPORT_LOCAL @ 0 NOSYNC
   Log = PHELMIVP_PID @ 0 NOSYNC
   Log = PHELMIVP_STATUS @ 0 NOSYNC
   Log = PLOGGER_CMD @ 0 NOSYNC
+  Log = RESTART_HELM @ 0 NOSYNC
   Log = RETURN @ 0 NOSYNC
   Log = TURN_RATE @ 0 NOSYNC
   Log = UPDATES_RETURN @ 0 NOSYNC
