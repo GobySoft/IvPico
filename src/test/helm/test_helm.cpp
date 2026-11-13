@@ -157,10 +157,10 @@ std::string mode(const Output& out)
 //  - after DEPLOY and the override, DRIVE in mode ACTIVE:SURVEYING, heading north;
 //  - reaching the waypoint posts RETURN=true.
 // On the iteration the survey completes, no behavior produces an objective
-// function, so the helm declares NothingToDo. With park_on_allstop (the
-// default) it then parks, as pHelmIvP does at the end of s1_alpha's survey.
-// Without it, RETURN=true switches to ACTIVE:RETURNING and turns the vehicle
-// around.
+// function, so the helm declares NothingToDo. That's an allstop pHelmIvP
+// rides out for an iteration, and park_on_allstop only parks on errors, so
+// with it set or not, RETURN=true then switches to ACTIVE:RETURNING and turns
+// the vehicle around without parking.
 void waypoint_mission(bool park_on_allstop)
 {
     const std::string scenario =
@@ -239,10 +239,8 @@ Behavior = BHV_Waypoint
     }
     check(surveying, scenario, "never surveyed north in DRIVE");
     check(returned, scenario, "waypt_survey never posted its endflag RETURN=true");
-    if (park_on_allstop)
-        check(parked && !turned, scenario, "didn't park when the survey completed");
-    else
-        check(turned && !parked, scenario, "never turned south in mode ACTIVE:RETURNING");
+    check(turned, scenario, "never turned south in mode ACTIVE:RETURNING");
+    check(!parked, scenario, "parked after the survey");
 }
 
 // One behavior posts an update for another: a timer's endflag posts
@@ -341,11 +339,124 @@ Behavior = BHV_ConstantHeading
     check(decided, scenario, "the spawned behavior never decided course 45");
 }
 
+Navigation contact(const std::string& name, double x, double y, double heading, double speed,
+                   double t)
+{
+    Navigation nav;
+    nav.set_self(false);
+    nav.set_type("kayak");
+    auto& n = *nav.mutable_nav();
+    n.mutable_vehicle()->set_name(name);
+    n.set_time(static_cast<int64_t>(t * 1e6));
+    n.mutable_enu()->set_e(x);
+    n.mutable_enu()->set_n(y);
+    n.mutable_attitude()->set_heading(heading * M_PI / 180);
+    n.add_speed()->set_value(speed);
+    return nav;
+}
+
+// The built-in contact manager (pContactMgrV20's alerts) spawns a collision
+// avoidance behavior. The avd_ template posts a BCM_ALERT_REQUEST on helm
+// start (alert_range 40, cpa_range 60). Ownship holds course 90 at 1 m/s
+// from the origin; "bob" starts 150 m east heading west at 2 m/s, and "ann"
+// stays 500 m north. Checks:
+//  - the CONTACT_INFO alert for bob, as a CONTACT_MANAGER posting, once bob
+//    is inside the cpa_range, and none for ann;
+//  - a SPAWN life event for avd_bob after that;
+//  - a post to the configured disable_var gives BHV_ABLE_FILTER;
+//  - with contact_alerts false, neither the alert nor the spawn.
+void contact_alert(bool contact_alerts)
+{
+    const std::string scenario =
+        std::string("contact_alert") + (contact_alerts ? "" : " (contact_alerts false)");
+    auto cfg = config(write_bhv("contact_alert", R"(
+Behavior = BHV_ConstantHeading
+{
+  name     = ch
+  pwt      = 100
+  heading  = 90
+  duration = no-time-limit
+}
+Behavior = BHV_ConstantSpeed
+{
+  name     = cs
+  pwt      = 100
+  speed    = 1
+  duration = no-time-limit
+}
+Behavior = BHV_AvoidCollision
+{
+  name       = avd_
+  pwt        = 200
+  templating = spawn
+  updates    = CONTACT_INFO
+  contact    = to-be-set
+  on_no_contact_ok = true
+  pwt_outer_dist = 40
+  pwt_inner_dist = 20
+  completed_dist = 60
+  min_util_cpa_dist = 8
+  max_util_cpa_dist = 25
+}
+)"));
+    cfg.set_start_in_drive(true);
+    cfg.set_contact_alerts(contact_alerts);
+    cfg.mutable_contact_manager()->set_disable_var("XYZ_DISABLE_TARGET");
+    Helm helm(cfg);
+    check(helm.config_warnings().empty(), scenario, "config warnings");
+
+    Vehicle vehicle;
+    double t = t0;
+    double bob_x = 150;
+    int alert_tick = -1, spawn_tick = -1;
+    bool ann_alerted = false, able_filter = false;
+    for (int i = 0; i < 200; ++i)
+    {
+        helm.handle(vehicle.navigation(t));
+        helm.handle(contact("bob", bob_x, 0, 270, 2, t));
+        helm.handle(contact("ann", 0, 500, 90, 0, t));
+        if (i == 150)
+            helm.handle(variable("XYZ_DISABLE_TARGET", "bob"));
+        const Output& out = helm.iterate(t);
+        for (const auto& p : out.postings)
+        {
+            if (p.origin() != Posting::CONTACT_MANAGER)
+                continue;
+            if (p.key() == "CONTACT_INFO" && p.sval() == "name=bob # contact=bob" && alert_tick < 0)
+                alert_tick = i;
+            if (p.key() == "CONTACT_INFO" && p.sval().find("ann") != std::string::npos)
+                ann_alerted = true;
+            if (p.key() == "BHV_ABLE_FILTER" && p.sval() == "contact=bob,action=disable")
+                able_filter = true;
+        }
+        for (const auto& e : out.life_events)
+            if (e.type() == ivp::interface::LifeEvent::SPAWN && e.behavior() == "avd_bob")
+                spawn_tick = i;
+        if (out.solution)
+            vehicle.follow(*out.solution);
+        bob_x -= 2 * dt;
+        t += dt;
+    }
+
+    check(!ann_alerted, scenario, "alerted on ann, 500 m away");
+    if (!contact_alerts)
+    {
+        check(alert_tick < 0, scenario, "the helm raised an alert itself");
+        check(spawn_tick < 0, scenario, "spawned avd_bob without an alert");
+        return;
+    }
+    // bob closes at 3 m/s from 150 m, so he's inside 60 m after 30 s (120 iterations)
+    check(alert_tick > 100 && alert_tick < 130, scenario,
+          "CONTACT_INFO for bob at iteration " + std::to_string(alert_tick));
+    check(spawn_tick > alert_tick, scenario, "no SPAWN for avd_bob after the alert");
+    check(able_filter, scenario, "no BHV_ABLE_FILTER from XYZ_DISABLE_TARGET");
+}
+
 // Allstop reasons and park-on-allstop:
 //  - no speed decision with a required speed domain gives
-//    MISSING_DECISION_VARIABLES and PARK, since park_on_allstop defaults to
-//    true. pHelmIvP parks during the one iteration's grace it gives a missing
-//    decision, so the zero solution comes with MANUAL_OVERRIDE;
+//    MISSING_DECISION_VARIABLES. pHelmIvP gives a missing decision an
+//    iteration's grace, and park_on_allstop parks only on errors, so the helm
+//    stays in DRIVE and posts no solution while the decision is missing;
 //  - with speed optional, the same behaviors give a CLEAR solution;
 //  - manual override in DRIVE gives MANUAL_OVERRIDE and PARK.
 void allstop()
@@ -365,7 +476,7 @@ Behavior = BHV_ConstantHeading
         Helm helm(cfg);
         Vehicle vehicle;
         double t = t0;
-        bool missing = false, zeroed = false;
+        bool missing = false, solution = false;
         for (int i = 0; i < 12; ++i)
         {
             helm.handle(vehicle.navigation(t));
@@ -374,14 +485,13 @@ Behavior = BHV_ConstantHeading
                 out.status.missing_decision_variables_size() == 1 &&
                 out.status.missing_decision_variables(0) == "speed")
                 missing = true;
-            if (out.solution && out.solution->allstop() != ivp::interface::CLEAR &&
-                out.solution->desired().speed().value() == 0)
-                zeroed = true;
+            if (out.solution)
+                solution = true;
             t += dt;
         }
         check(missing, scenario, "no MISSING_DECISION_VARIABLES for speed");
-        check(zeroed, scenario, "no zero solution for the missing speed");
-        check(helm.state() == Status::PARK, scenario, "didn't park on allstop");
+        check(!solution, scenario, "a solution without a speed decision");
+        check(helm.state() == Status::DRIVE, scenario, "parked on a missing decision");
     }
     {
         auto cfg = config(bhv);
@@ -476,6 +586,8 @@ int main()
     waypoint_mission(false);
     update_through_echo();
     spawn();
+    contact_alert(true);
+    contact_alert(false);
     allstop();
     malconfig();
     deferred_initialize();

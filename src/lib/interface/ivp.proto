@@ -163,6 +163,8 @@ message Posting
         INITIALIZE = 3;     // aux "HELM_VAR_INIT"
         HELM_START = 100 [(ivp.ev).level = ADVANCED];     // aux "HELM_STARTUP_MSG"
         DEFAULT = 101 [(ivp.ev).level = ADVANCED];
+        // what pContactMgrV20 would post: alert flags, warnings, BHV_ABLE_FILTER
+        CONTACT_MANAGER = 102 [(ivp.ev).level = ADVANCED];
     }
     Origin origin = 2;
     string behavior = 3;

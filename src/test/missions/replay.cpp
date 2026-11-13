@@ -19,7 +19,7 @@
 // ivpico::helm::Helm, and checks that the helm makes the same decisions and
 // posts the same things.
 //
-// Usage: replay <fixture directory> [stream to print in full, e.g. "loiter LOITER_INDEX"]
+// Usage: replay <fixture directory> [--alerts] [stream to print in full, e.g. "loiter LOITER_INDEX"]
 //
 // The fixture holds the vehicle's .moos file (for pHelmIvP's configuration),
 // its .bhv files, and an alog trimmed to pHelmIvP's posts and the posts to
@@ -37,9 +37,11 @@
 //
 // What's compared, as sequences of changes, each change matched within
 // `tolerance` iterations, and all but `max_mismatch` of them matching (a
-// stream with fewer than 20 changes has to match exactly). Continuous values
-// (distances, ETAs, track points) differ now and then, when pHelmIvP got a
-// navigation update a little later or earlier than its timestamp says.
+// stream with fewer than 20 changes has to match exactly). A change with the
+// same text on the same iteration but different numbers counts separately,
+// against `max_numeric_mismatch`: continuous values (distances, ETAs, track
+// points) differ now and then, when pHelmIvP got a navigation update a little
+// later or earlier than its timestamp says.
 //  - IVPHELM_STATE and IVPHELM_ALLSTOP against Status;
 //  - mode variables against MODE postings;
 //  - initialize posts against INITIALIZE postings;
@@ -49,6 +51,18 @@
 // DESIRED_* are compared iteration by iteration: within one step of the
 // domain on all but `desired_max_mismatch` of the iterations where either
 // helm decided, and never off for more than `desired_max_run` in a row.
+//
+// Contacts are replayed two ways:
+//  - by default, the recorded contact manager's posts (pContactMgrV20's alerts,
+//    BHV_ABLE_FILTER) go in like any other input, and the helm's own contact
+//    alerts are off (contact_alerts: false). This checks the helm alone;
+//  - with --alerts, those posts are left out, and the helm raises alerts
+//    itself from the .moos file's pContactMgrV20 block. Its posts are compared
+//    with pContactMgrV20's, and every change may be `alerts_tolerance`
+//    iterations off, since pContactMgrV20 iterates on its own clock. A
+//    behavior spawned an iteration later posts every value an iteration
+//    later, so only the helm state, allstops, modes, life events, active
+//    behaviors and the contact manager's posts are compared.
 //
 // Prints a summary per stream, the first mismatches in each, and exits non-zero
 // if any stream failed.
@@ -77,10 +91,12 @@ using ivpico::helm::Output;
 
 namespace
 {
-constexpr int tolerance = 1;
+int tolerance = 1;
+constexpr int alerts_tolerance = 2;
 constexpr double mail_latency = 0.005;
 constexpr double number_tolerance = 1e-3;
 constexpr double max_mismatch = 0.05;
+constexpr double max_numeric_mismatch = 0.2;
 constexpr double desired_max_mismatch = 0.01;
 constexpr int desired_max_run = 3;
 constexpr int report_mismatches = 5;
@@ -160,13 +176,94 @@ Alog read_alog(const fs::path& path)
     return alog;
 }
 
-// pHelmIvP's block of the .moos file, as HelmConfig
+bool is_contact_manager(const std::string& source)
+{
+    return source.rfind("pContactMgrV20", 0) == 0;
+}
+
+// pContactMgrV20's block of the .moos file
+void read_contact_manager(const std::vector<std::string>& lines, HelmConfig::ContactManager& cm)
+{
+    // in reverse, as MOOS's mission reader hands them over
+    for (auto it = lines.rbegin(); it != lines.rend(); ++it)
+    {
+        const std::string& line = *it;
+        const auto eq = line.find('=');
+        const std::string key = lower(trim(line.substr(0, eq)));
+        const std::string value = eq == std::string::npos ? "" : trim(line.substr(eq + 1));
+        const bool truth = lower(value) == "true";
+        if (key == "alert")
+            cm.add_alert(value);
+        else if (key == "ignore_name")
+            cm.add_ignore_name(value);
+        else if (key == "match_name")
+            cm.add_match_name(value);
+        else if (key == "ignore_group")
+            cm.add_ignore_group(value);
+        else if (key == "match_group")
+            cm.add_match_group(value);
+        else if (key == "ignore_type")
+            cm.add_ignore_type(value);
+        else if (key == "match_type")
+            cm.add_match_type(value);
+        else if (key == "ignore_region")
+            cm.add_ignore_region(value);
+        else if (key == "match_region")
+            cm.add_match_region(value);
+        else if (key == "strict_ignore")
+            cm.set_strict_ignore(truth);
+        else if (key == "ownship_group")
+            cm.set_ownship_group(value);
+        else if (key == "ownship_type")
+            cm.set_ownship_type(value);
+        else if (key == "contact_max_age")
+            cm.set_contact_max_age(std::stod(value));
+        else if (key == "reject_range")
+            cm.set_reject_range(lower(value) == "off" ? 0 : std::stod(value));
+        else if (key == "max_contacts")
+            cm.set_max_contacts(std::stoul(value));
+        else if (key == "decay")
+        {
+            const auto comma = value.find(',');
+            cm.set_decay_start(std::stod(value.substr(0, comma)));
+            cm.set_decay_end(std::stod(value.substr(comma + 1)));
+        }
+        else if (key == "hold_alerts_for_helm")
+            cm.set_hold_alerts_for_helm(truth);
+        else if (key == "alert_verbose")
+            cm.set_alert_verbose(truth);
+        else if (key == "disable_var")
+            cm.set_disable_var(value);
+        else if (key == "enable_var")
+            cm.set_enable_var(value);
+        else if (key == "expunge_var")
+            cm.set_expunge_var(value);
+        else if (key == "able_flag")
+            cm.add_able_flag(value);
+        else if (key == "disable_flag")
+            cm.add_disable_flag(value);
+        else if (key == "enable_flag")
+            cm.add_enable_flag(value);
+        else if (key == "early_warning_time")
+            cm.set_early_warning_time(std::stod(value));
+        else if (key == "early_warning_flag")
+            cm.add_early_warning_flag(value);
+        else if (key == "cease_warning_flag")
+            cm.add_cease_warning_flag(value);
+        else if (key == "retire_flag")
+            cm.add_retire_flag(value);
+        else if (key != "apptick" && key != "commstick")
+            std::cout << "  (pContactMgrV20 parameter not replayed: " << line << ")\n";
+    }
+}
+
+// pHelmIvP's (and pContactMgrV20's) blocks of the .moos file, as HelmConfig
 HelmConfig read_config(const fs::path& moos_file, const fs::path& dir)
 {
     HelmConfig cfg;
     std::ifstream in(moos_file);
-    bool in_block = false, in_helm = false;
-    std::vector<std::string> helm_lines;
+    bool in_block = false, in_helm = false, in_cm = false;
+    std::vector<std::string> helm_lines, cm_lines;
     for (std::string line; std::getline(in, line);)
     {
         line = trim(line.substr(0, line.find("//")));
@@ -181,6 +278,7 @@ HelmConfig read_config(const fs::path& moos_file, const fs::path& dir)
         if (key == "processconfig")
         {
             in_helm = value == "pHelmIvP";
+            in_cm = value == "pContactMgrV20";
             continue;
         }
         if (line == "{")
@@ -190,12 +288,15 @@ HelmConfig read_config(const fs::path& moos_file, const fs::path& dir)
         }
         if (line == "}")
         {
-            in_block = in_helm = false;
+            in_block = in_helm = in_cm = false;
             continue;
         }
         if (in_block && in_helm)
             helm_lines.push_back(line);
+        if (in_block && in_cm)
+            cm_lines.push_back(line);
     }
+    read_contact_manager(cm_lines, *cfg.mutable_contact_manager());
 
     // MOOS's mission reader hands pHelmIvP its configuration in reverse order,
     // which sets the order of the domain variables
@@ -374,7 +475,13 @@ std::string life_event(const std::string& spec)
 bool compare(const std::string& stream, const std::vector<Change>& moos,
              const std::vector<Change>& ivpico)
 {
+    // a change within number_tolerance of the value before it is one helm
+    // seeing a difference the other didn't, from rounding
+    auto insignificant = [](const std::vector<Change>& changes, size_t k)
+    { return k > 0 && same_value(changes[k - 1].value, changes[k].value); };
+
     std::vector<std::string> problems;
+    size_t numeric = 0;
     size_t i = 0, j = 0;
     while (i < moos.size() && j < ivpico.size())
     {
@@ -384,6 +491,23 @@ bool compare(const std::string& stream, const std::vector<Change>& moos,
             ++i, ++j;
             continue;
         }
+        const auto moos_parts = split_numbers(moos[i].value);
+        const auto ivpico_parts = split_numbers(ivpico[j].value);
+        const bool only_numbers = moos[i].tick == ivpico[j].tick &&
+                                  moos_parts.first == ivpico_parts.first &&
+                                  moos_parts.second.size() == ivpico_parts.second.size();
+        if (!only_numbers && insignificant(moos, i))
+        {
+            ++i;
+            continue;
+        }
+        if (!only_numbers && insignificant(ivpico, j))
+        {
+            ++j;
+            continue;
+        }
+        if (only_numbers)
+            ++numeric;
         problems.push_back("pHelmIvP iteration " + std::to_string(moos[i].tick) + ": \"" +
                            moos[i].value + "\", IvPico iteration " +
                            std::to_string(ivpico[j].tick) + ": \"" + ivpico[j].value + "\"");
@@ -397,15 +521,22 @@ bool compare(const std::string& stream, const std::vector<Change>& moos,
             ++j;
     }
     for (; i < moos.size(); ++i)
-        problems.push_back("pHelmIvP iteration " + std::to_string(moos[i].tick) + ": \"" +
-                           moos[i].value + "\", missing from IvPico");
+        if (!insignificant(moos, i))
+            problems.push_back("pHelmIvP iteration " + std::to_string(moos[i].tick) + ": \"" +
+                               moos[i].value + "\", missing from IvPico");
     for (; j < ivpico.size(); ++j)
-        problems.push_back("IvPico iteration " + std::to_string(ivpico[j].tick) + ": \"" +
-                           ivpico[j].value + "\", missing from pHelmIvP");
+        if (!insignificant(ivpico, j))
+            problems.push_back("IvPico iteration " + std::to_string(ivpico[j].tick) + ": \"" +
+                               ivpico[j].value + "\", missing from pHelmIvP");
 
-    const bool ok = problems.size() <= max_mismatch * std::max(moos.size(), ivpico.size());
+    const size_t changes = std::max(moos.size(), ivpico.size());
+    const bool ok = problems.size() - numeric <= max_mismatch * changes &&
+                    numeric <= max_numeric_mismatch * changes;
     std::cout << (ok ? "  ok    " : "  FAIL  ") << stream << " (" << moos.size() << " changes, "
-              << problems.size() << " off)\n";
+              << problems.size() << " off";
+    if (numeric)
+        std::cout << ", " << numeric << " only in numbers";
+    std::cout << ")\n";
     for (size_t k = 0; k < problems.size() && k < report_mismatches; ++k)
         std::cout << "          " << problems[k] << "\n";
     if (problems.size() > report_mismatches)
@@ -457,12 +588,20 @@ bool compare_desired(const std::string& var, double step, bool wrap,
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2 && argc != 3)
+    std::vector<std::string> args(argv + 1, argv + argc);
+    const auto alerts_arg = std::find(args.begin(), args.end(), "--alerts");
+    const bool alerts = alerts_arg != args.end();
+    if (alerts)
+        args.erase(alerts_arg);
+    if (args.size() != 1 && args.size() != 2)
     {
-        std::cerr << "usage: replay <fixture directory> [stream to print in full]\n";
+        std::cerr << "usage: replay <fixture directory> [--alerts] [stream to print in full]\n";
         return 2;
     }
-    const fs::path dir = fs::path(argv[1]).lexically_normal();
+    const std::string print_stream = args.size() == 2 ? args[1] : "";
+    if (alerts)
+        tolerance = alerts_tolerance;
+    const fs::path dir = fs::path(args[0]).lexically_normal();
     fs::path moos_file, alog_file;
     for (const auto& f : fs::directory_iterator(dir))
     {
@@ -473,9 +612,10 @@ int main(int argc, char* argv[])
             alog_file = f.path();
     }
     std::cout << "Replaying " << (dir.has_filename() ? dir : dir.parent_path()).filename().string()
-              << "\n";
+              << (alerts ? " with the helm's own contact alerts" : "") << "\n";
 
-    const HelmConfig cfg = read_config(moos_file, dir);
+    HelmConfig cfg = read_config(moos_file, dir);
+    cfg.set_contact_alerts(alerts);
     const Alog alog = read_alog(alog_file);
 
     auto is_helm = [](const Entry& e) { return e.source.rfind("pHelmIvP", 0) == 0; };
@@ -493,11 +633,31 @@ int main(int argc, char* argv[])
                                1);
     };
 
+    // How many contact reports pHelmIvP's ledger had taken in by each
+    // iteration, from its IVPHELM_LEDGER_SUMMARY ("now:1, reps:748, ...").
+    // Relayed reports reach pHelmIvP too unevenly to place by their log times.
+    std::vector<std::optional<size_t>> reports_by_tick(ticks.size());
+    for (const auto& e : alog.entries)
+    {
+        const auto reps = e.value.find("reps:");
+        if (is_helm(e) && e.var == "IVPHELM_LEDGER_SUMMARY" && reps != std::string::npos)
+            reports_by_tick[tick_of(e.time)] = std::stoul(e.value.substr(reps + 5));
+    }
+    auto is_report = [](const Entry& e)
+    { return e.var == "NODE_REPORT" || e.var == "AIS_REPORT" || e.var == "AIS_REPORT_LOCAL"; };
+
+    std::map<std::string, bool> registered;
+    for (const auto& e : alog.entries)
+        if (is_helm(e) && e.var == "IVPHELM_REGISTER")
+            registered[e.value] = true;
+
     // pHelmIvP's side
     Streams moos;
     std::map<std::string, std::map<int, double>> moos_desired;
     for (const auto& e : alog.entries)
     {
+        if (alerts && is_contact_manager(e.source))
+            add_change(moos, "contact_manager " + e.var, tick_of(e.time), e.value);
         if (!is_helm(e))
             continue;
         const int k = tick_of(e.time);
@@ -530,7 +690,24 @@ int main(int argc, char* argv[])
 
     Streams ivpico;
     std::map<std::string, std::map<int, double>> ivpico_desired;
-    size_t next_input = 0;
+    auto input = [&](const Entry& e)
+    {
+        ivp::interface::Variable v;
+        v.set_time(static_cast<int64_t>((alog.logstart + e.time) * 1e6));
+        v.set_key(e.var);
+        double d;
+        if (is_number(e.value, &d))
+            v.set_dval(d);
+        else
+            v.set_sval(e.value);
+        helm.handle(v);
+    };
+    std::vector<const Entry*> reports;
+    for (const auto& e : alog.entries)
+        if (!is_helm(e) && is_report(e))
+            reports.push_back(&e);
+
+    size_t next_input = 0, next_report = 0;
     for (size_t k = 0; k < ticks.size(); ++k)
     {
         for (; next_input < alog.entries.size() &&
@@ -538,18 +715,15 @@ int main(int argc, char* argv[])
              ++next_input)
         {
             const Entry& e = alog.entries[next_input];
-            if (is_helm(e))
+            if (is_helm(e) || (alerts && is_contact_manager(e.source)) || is_report(e))
                 continue;
-            ivp::interface::Variable v;
-            v.set_time(static_cast<int64_t>((alog.logstart + e.time) * 1e6));
-            v.set_key(e.var);
-            double d;
-            if (is_number(e.value, &d))
-                v.set_dval(d);
-            else
-                v.set_sval(e.value);
-            helm.handle(v);
+            input(e);
         }
+        for (; next_report < reports.size() &&
+               (reports_by_tick[k] ? next_report < *reports_by_tick[k]
+                                   : reports[next_report]->time <= ticks[k] - mail_latency);
+             ++next_report)
+            input(*reports[next_report]);
 
         const Output& out = helm.iterate(alog.logstart + ticks[k]);
         const int tick = static_cast<int>(k);
@@ -579,6 +753,11 @@ int main(int argc, char* argv[])
                     break;
                 case ivp::interface::Posting::BEHAVIOR:
                     add_change(ivpico, p.behavior() + " " + p.key(), tick, value);
+                    break;
+                // the recording has only the posts to variables pHelmIvP registered
+                case ivp::interface::Posting::CONTACT_MANAGER:
+                    if (registered.count(p.key()))
+                        add_change(ivpico, "contact_manager " + p.key(), tick, value);
                     break;
                 default: break;
             }
@@ -617,20 +796,30 @@ int main(int argc, char* argv[])
     std::map<std::string, bool> names;
     for (const auto& [name, changes] : moos) names[name] = true;
     for (const auto& [name, changes] : ivpico) names[name] = true;
-    for (const auto& [name, unused] : names) ok = compare(name, moos[name], ivpico[name]) && ok;
-
-    if (argc == 3)
+    auto structural = [](const std::string& name)
     {
-        std::cout << "pHelmIvP " << argv[2] << ":\n";
-        for (const auto& c : moos[argv[2]]) std::cout << "  " << c.tick << " " << c.value << "\n";
-        std::cout << "IvPico " << argv[2] << ":\n";
-        for (const auto& c : ivpico[argv[2]]) std::cout << "  " << c.tick << " " << c.value << "\n";
+        return name == "IVPHELM_STATE" || name == "IVPHELM_ALLSTOP" ||
+               name == "IVPHELM_LIFE_EVENT" || name == "IVPHELM_BHV_ACTIVE" ||
+               name.rfind("mode ", 0) == 0 || name.rfind("contact_manager ", 0) == 0;
+    };
+    for (const auto& [name, unused] : names)
+        if (!alerts || structural(name))
+            ok = compare(name, moos[name], ivpico[name]) && ok;
+
+    if (!print_stream.empty())
+    {
+        std::cout << "pHelmIvP " << print_stream << ":\n";
+        for (const auto& c : moos[print_stream])
+            std::cout << "  " << c.tick << " " << c.value << "\n";
+        std::cout << "IvPico " << print_stream << ":\n";
+        for (const auto& c : ivpico[print_stream])
+            std::cout << "  " << c.tick << " " << c.value << "\n";
     }
 
     std::map<std::string, bool> desired_vars;
     for (const auto& [var, values] : moos_desired) desired_vars[var] = true;
     for (const auto& [var, values] : ivpico_desired) desired_vars[var] = true;
-    for (const auto& [var, unused] : desired_vars)
+    for (const auto& [var, unused] : alerts ? decltype(desired_vars)() : desired_vars)
     {
         double step = 0;
         bool wrap = false;

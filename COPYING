@@ -12,9 +12,13 @@ later version.
 
 Exceptions:
 
- - src/lib/helm/helm.cpp ports logic from MOOS-IvP's pHelmIvP and is
-   distributed under the GNU General Public License, version 3 or (at your
-   option) any later version.
+ - src/lib/helm/helm.cpp and src/lib/helm/contact_manager.{h,cpp} port logic
+   from MOOS-IvP's pHelmIvP and pContactMgrV20, and are distributed under the
+   GNU General Public License, version 3 or (at your option) any later
+   version.
+ - src/lib/helm/contacts holds files copied unchanged from MOOS-IvP's
+   pContactMgrV20, under MOOS-IvP's license (GNU General Public License,
+   version 3 or later).
  - The mission files in src/test/missions/fixtures and
    launch/goby/alpha/config/alpha.bhv come from MOOS-IvP's missions, under
    MOOS-IvP's license (GNU General Public License, version 3 or later).
