@@ -40,47 +40,43 @@ apt_install "${packages[@]}"
 
 . /etc/os-release
 
-# openocean-messages and MOOS-IvP's helm libraries (built without MOOS), from Open Ocean
-# Software's continuous builds (apt.oceansoft.org) if apt doesn't have them yet
-oo_policy=$(apt-cache policy libivp-helm-dev)
-if ! grep -q "Candidate: [^(]" <<< "${oo_policy}"; then
-    apt_install curl gpg
-    keyring=/usr/share/keyrings/openocean-continuous.asc
-    fingerprint=DAF08DD7788E6C84C6F8E8D3E59E1A81FECDB228
-    key=$(curl -fsSL https://raw.githubusercontent.com/openocean-software/openocean-build/main/keys/continuous.asc)
-    if ! gpg --show-keys --with-colons <<< "${key}" | grep -q "^fpr:*${fingerprint}:"; then
-        echo "The Open Ocean Software continuous key's fingerprint isn't ${fingerprint}" >&2
-        exit 1
-    fi
-    $SUDO tee "${keyring}" <<< "${key}" > /dev/null
-    printf "Types: deb\nURIs: https://apt.oceansoft.org/continuous/%s-%s\nSuites: %s\nComponents: main\nSigned-By: %s\n" \
-        "${ID}" "${VERSION_CODENAME}" "${VERSION_CODENAME}" "${keyring}" |
-        $SUDO tee /etc/apt/sources.list.d/openocean.sources > /dev/null
-    $SUDO apt-get update
-fi
-apt_install libopenocean-messages-dev libivp-helm-dev
-
+packages=(libopenocean-messages-dev libivp-helm-dev)
 if ${goby}; then
     # libgoby3-dev only recommends libais-dev and dccl5-compiler, but goby's CMake package
     # links libais.so, and goby_add_app() runs protoc-gen-dccl. MOOS-IvP's apps
     # (pMarineViewer for the Goby launches) need libmoos-ivp but don't depend on it
-    goby_packages=(libgoby3-dev goby3-apps libais-dev dccl5-compiler
-        libgoby3-moos-dev goby3-moos moosdb10 moos-ivp-apps moos-ivp-gui libmoos-ivp)
-    # If apt can't install them yet, add packages.gobysoft.org's continuous builds, which
-    # have 'goby test' (newer than 3.6.1), pinned over another source's Goby3 whose
-    # dependencies may not be available
-    if ! apt-get -s install "${goby_packages[@]}" > /dev/null 2>&1; then
-        apt_install curl gpg
-        keyring=/usr/share/keyrings/gobysoft-archive-keyring.gpg
-        if [ ! -f "${keyring}" ]; then
-            curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x19478082E2F8D3FE" |
-                gpg --dearmor | $SUDO tee "${keyring}" > /dev/null
-        fi
-        echo "deb [signed-by=${keyring}] http://packages.gobysoft.org/${ID}/continuous/ ${VERSION_CODENAME}/" |
-            $SUDO tee /etc/apt/sources.list.d/gobysoft_continuous.list > /dev/null
-        printf "Package: *\nPin: origin packages.gobysoft.org\nPin-Priority: 600\n" |
-            $SUDO tee /etc/apt/preferences.d/gobysoft_continuous > /dev/null
-        $SUDO apt-get update
-    fi
-    apt_install "${goby_packages[@]}"
+    packages+=(libgoby3-dev goby3-apps libais-dev dccl5-compiler
+        libgoby3-moos-dev goby3-moos moos10-mit-db moos-ivp-apps moos-ivp-gui libmoos-ivp)
 fi
+
+# Adds an apt.oceansoft.org channel to openocean_sources, checking its key's fingerprint
+openocean_sources=""
+add_openocean() {
+    local channel=$1 fingerprint=$2 key
+    local keyring=/usr/share/keyrings/openocean-${channel}.asc
+    key=$(curl -fsSL "https://raw.githubusercontent.com/openocean-software/openocean-build/main/keys/${channel}.asc")
+    if ! gpg --show-keys --with-colons <<< "${key}" | grep -q "^fpr:*${fingerprint}:"; then
+        echo "The Open Ocean Software ${channel} key's fingerprint isn't ${fingerprint}" >&2
+        exit 1
+    fi
+    $SUDO tee "${keyring}" <<< "${key}" > /dev/null
+    openocean_sources+="Types: deb
+URIs: https://apt.oceansoft.org/${channel}/${ID}-${VERSION_CODENAME}
+Suites: ${VERSION_CODENAME}
+Components: main
+Signed-By: ${keyring}
+
+"
+}
+
+# If apt can't install them yet, add Open Ocean Software's continuous builds (for
+# openocean-messages, MOOS-IvP's helm libraries built without MOOS, and Goby3 with
+# 'goby test') and its releases, which have what those depend on (DCCL, MOOS, ...)
+if ! apt-get -s install "${packages[@]}" > /dev/null 2>&1; then
+    apt_install curl gpg
+    add_openocean continuous DAF08DD7788E6C84C6F8E8D3E59E1A81FECDB228
+    add_openocean release EAD278F6A25644C2C559DBB6D28A2EAB14D2A9E5
+    $SUDO tee /etc/apt/sources.list.d/openocean.sources <<< "${openocean_sources}" > /dev/null
+    $SUDO apt-get update
+fi
+apt_install "${packages[@]}"

@@ -25,8 +25,10 @@ One way to think of this project is as a generator for the equivalent of the MOO
 
 `init.sh` installs the Ubuntu packages needed to build IvPico:
 
-- [openocean-messages](https://github.com/openocean-software/openocean-messages), for the `Navigation` and `ControlSetpoint` messages, and MOOS-IvP's helm libraries built without MOOS ([GobySoft's `ivp-without-moos`](https://github.com/GobySoft/moos-ivp/tree/ivp-without-moos)), for the IvP solver and behaviors. Both come from [Open Ocean Software](https://github.com/openocean-software/openocean-build)'s continuous builds (apt.oceansoft.org), added if apt doesn't already have them.
-- Goby3, for the Goby app, adding [packages.gobysoft.org](http://packages.gobysoft.org)'s continuous builds if apt doesn't already have it. `init.sh --no-goby` leaves Goby3 out, and `build.sh` then skips the Goby app.
+- [openocean-messages](https://github.com/openocean-software/openocean-messages), for the `Navigation` and `ControlSetpoint` messages, and MOOS-IvP's helm libraries built without MOOS ([GobySoft's `ivp-without-moos`](https://github.com/GobySoft/moos-ivp/tree/ivp-without-moos)), for the IvP solver and behaviors.
+- Goby3, for the Goby app. `init.sh --no-goby` leaves Goby3 out, and `build.sh` then skips the Goby app.
+
+All of these come from [Open Ocean Software](https://github.com/openocean-software/openocean-build)'s continuous builds, with its releases for what they depend on (DCCL, MOOS, ...), at apt.oceansoft.org. `init.sh` adds both if apt can't install the packages already.
 
 `build.sh` then builds IvPico in `build/` and installs it into `build/usr`.
 
