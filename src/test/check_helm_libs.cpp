@@ -1,4 +1,21 @@
-// Checks that IvPico can use MOOS-IvP's helm libraries (external/moos-ivp, built by build.sh):
+// Copyright 2026:
+//   GobySoft, LLC
+//
+// This file is part of IvPico.
+//
+// IvPico is free software: you can redistribute it and/or modify it under the
+// terms of the GNU General Public License as published by the Free Software
+// Foundation, either version 2 of the License, or (at your option) any later
+// version.
+//
+// IvPico is distributed in the hope that it will be useful, but WITHOUT ANY
+// WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with IvPico. If not, see <https://www.gnu.org/licenses/>.
+
+// Checks that IvPico can use MOOS-IvP's helm libraries (libivp-helm-dev):
 //
 //  1. The static behavior factory creates behaviors from lib_behaviors-marine
 //     and lib_behaviors-colregs, which loads every helm library.
