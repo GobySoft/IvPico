@@ -48,3 +48,7 @@ Contacts come in as `Navigation` with `self: false`, or as `NODE_REPORT` variabl
 
 `launch/goby/alpha` runs the alpha mission against Goby's basic frontseat simulator, with OpenCPN as a chart display: see its [README](launch/goby/alpha/README.md).
 
+
+## License
+
+The libraries (`src/lib`) are LGPL 2.1 or later, and the binaries and tests (`src/bin`, `src/test`) are GPL 2 or later. `src/lib/helm/helm.cpp`, which ports pHelmIvP's logic, is GPL 3 or later, as is MOOS-IvP, whose helm libraries IvPico links. See [COPYING](COPYING).
