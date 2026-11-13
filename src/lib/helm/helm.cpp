@@ -23,6 +23,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <map>
 #include <set>
 #include <variant>
@@ -46,6 +47,7 @@
 #include "Populator_BehaviorSet.h"
 #include "VarDataPair.h"
 
+#include "behavior_file.h"
 #include "contact_manager.h"
 #include "conversions.h"
 
@@ -349,9 +351,35 @@ void Helm::Impl::build_behaviors()
     populator.setBHVDirNotFoundOK(cfg_.behavior_dir_not_found_ok());
     populator.setOwnship(ownship_);
     for (const auto& dir : cfg_.behavior_dir()) populator.addBehaviorDir(dir);
-    bhv_set_ = populator.populate(
-        std::set<std::string>(cfg_.behavior_file().begin(), cfg_.behavior_file().end()));
-    for (const auto& w : populator.getConfigWarnings()) config_warnings_.push_back(w);
+    if (!needs_combining(cfg_))
+    {
+        bhv_set_ = populator.populate(
+            std::set<std::string>(cfg_.behavior_file().begin(), cfg_.behavior_file().end()));
+        for (const auto& w : populator.getConfigWarnings()) config_warnings_.push_back(w);
+    }
+    else
+    {
+        const CombinedBehaviors combined = combine_behaviors(cfg_, config_warnings_);
+        if (!config_warnings_.empty())
+            return;
+        // the Populator reads only files
+        std::string path =
+            (std::filesystem::temp_directory_path() / "ivpico_behaviors_XXXXXX").string();
+        const int fd = mkstemp(path.data());
+        if (fd < 0 || write(fd, combined.text.data(), combined.text.size()) !=
+                          static_cast<ssize_t>(combined.text.size()))
+        {
+            config_warnings_.push_back("Couldn't write the combined behaviors to " + path);
+            if (fd >= 0)
+                close(fd);
+            return;
+        }
+        close(fd);
+        bhv_set_ = populator.populate(path);
+        std::filesystem::remove(path);
+        for (const auto& w : populator.getConfigWarnings())
+            config_warnings_.push_back(relocate_warning(w, path, combined));
+    }
 
     if (!bhv_set_)
     {

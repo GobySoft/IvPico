@@ -35,6 +35,8 @@ apt_install() {
 
 # xz-utils: the replay tests' recorded missions are compressed
 packages=(cmake ninja-build g++ git ca-certificates protobuf-compiler libprotobuf-dev xz-utils)
+# optional: YAML behavior files (.bhv.yml), and the test that validates them against the schema
+packages+=(libyaml-cpp-dev python3-jsonschema python3-yaml)
 $SUDO apt-get update
 apt_install "${packages[@]}"
 

@@ -1,0 +1,2 @@
+# s1_alpha with its behaviors from helm.pb.cfg (inline)
+include: [../s1_alpha/test.yml]

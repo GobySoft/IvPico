@@ -1,0 +1,81 @@
+// Copyright 2026:
+//   GobySoft, LLC
+//
+// This file is part of IvPico.
+//
+// IvPico is free software: you can redistribute it and/or modify it under the
+// terms of the GNU Lesser General Public License as published by the Free Software
+// Foundation, either version 2.1 of the License, or (at your option) any later
+// version.
+//
+// IvPico is distributed in the hope that it will be useful, but WITHOUT ANY
+// WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with IvPico. If not, see <https://www.gnu.org/licenses/>.
+
+syntax = "proto3";
+
+package ivp.interface;
+
+// What one .bhv or .bhv.yml file holds. Values are kept as their source text,
+// since the behaviors parse them.
+message BehaviorSet
+{
+    // "initialize" (or "initialize_" if deferred)
+    message Initialize
+    {
+        string var = 1;
+        string value = 2;
+        bool deferred = 3;
+    }
+    repeated Initialize initialize = 1;
+
+    // "set MODE = ACTIVE { conditions } else_value"
+    message Mode
+    {
+        string set = 1;
+        repeated string condition = 2;
+        optional string else_value = 3;
+    }
+    repeated Mode mode = 2;
+
+    // The parameters every behavior takes are fields; the rest are params, in order
+    message Behavior
+    {
+        string type = 1;
+        optional string name = 2;
+        optional string pwt = 3;
+        repeated string condition = 4;
+        optional string updates = 5;
+        optional string templating = 6;
+        // seconds, or no-time-limit
+        optional string duration = 7;
+        optional string duration_status = 8;
+        optional string duration_reset = 9;
+        optional string duration_idle_decay = 10;
+        optional string perpetual = 11;
+        repeated string nostarve = 12;
+        repeated string post_mapping = 13;
+        optional string comms_policy = 14;
+
+        repeated string endflag = 20;
+        repeated string runflag = 21;
+        repeated string runxflag = 22;
+        repeated string activeflag = 23;
+        repeated string inactiveflag = 24;
+        repeated string idleflag = 25;
+        repeated string spawnflag = 26;
+        repeated string spawnxflag = 27;
+        repeated string configflag = 28;
+
+        message Param
+        {
+            string key = 1;
+            string value = 2;
+        }
+        repeated Param param = 100;
+    }
+    repeated Behavior behavior = 3;
+}

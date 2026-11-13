@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/GobySoft/IvPico/blob/main/share/ivpico/bhv.schema.json",
+  "title": "IvPico behavior file (.bhv.yml)",
+  "description": "MOOS-IvP behaviors, modes and initial variables, as a .bhv file holds them",
+  "type": "object",
+  "additionalProperties": false,
+  "patternProperties": {
+    "^x-": { "description": "Ignored: a place for anchors to merge elsewhere" }
+  },
+  "properties": {
+    "initialize": {
+      "description": "Variables posted when the helm starts (initialize)",
+      "$ref": "#/$defs/variables"
+    },
+    "initialize_deferred": {
+      "description": "Variables posted unless another app has set them (initialize_)",
+      "$ref": "#/$defs/variables"
+    },
+    "modes": {
+      "description": "Hierarchical modes (set), in order",
+      "type": "array",
+      "items": { "$ref": "#/$defs/mode" }
+    },
+    "behaviors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/behavior" }
+    }
+  },
+  "$defs": {
+    "value": { "type": ["string", "number", "boolean"] },
+    "values": {
+      "oneOf": [
+        { "$ref": "#/$defs/value" },
+        { "type": "array", "items": { "$ref": "#/$defs/value" } }
+      ]
+    },
+    "variables": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[^\\s=,{}]+$" },
+      "additionalProperties": { "$ref": "#/$defs/value" }
+    },
+    "mode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["set"],
+      "properties": {
+        "set": { "description": "MODE_VAR = value", "type": "string", "pattern": "\\S\\s*=\\s*\\S" },
+        "condition": { "$ref": "#/$defs/values" },
+        "else": { "$ref": "#/$defs/value" }
+      }
+    },
+    "behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "pattern": "^\\S+$" },
+        "name": { "$ref": "#/$defs/value" },
+        "pwt": { "$ref": "#/$defs/value" },
+        "condition": { "$ref": "#/$defs/values" },
+        "updates": { "$ref": "#/$defs/value" },
+        "templating": { "$ref": "#/$defs/value" },
+        "duration": { "$ref": "#/$defs/value" },
+        "duration_status": { "$ref": "#/$defs/value" },
+        "duration_reset": { "$ref": "#/$defs/value" },
+        "duration_idle_decay": { "$ref": "#/$defs/value" },
+        "perpetual": { "$ref": "#/$defs/value" },
+        "nostarve": { "$ref": "#/$defs/values" },
+        "post_mapping": { "$ref": "#/$defs/values" },
+        "comms_policy": { "$ref": "#/$defs/value" },
+        "endflag": { "$ref": "#/$defs/values" },
+        "runflag": { "$ref": "#/$defs/values" },
+        "runxflag": { "$ref": "#/$defs/values" },
+        "activeflag": { "$ref": "#/$defs/values" },
+        "inactiveflag": { "$ref": "#/$defs/values" },
+        "idleflag": { "$ref": "#/$defs/values" },
+        "spawnflag": { "$ref": "#/$defs/values" },
+        "spawnxflag": { "$ref": "#/$defs/values" },
+        "configflag": { "$ref": "#/$defs/values" },
+        "params": {
+          "description": "The behavior's own parameters, in order; a list for a parameter given more than once",
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/values" }
+        }
+      }
+    }
+  }
+}

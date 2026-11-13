@@ -19,6 +19,7 @@ syntax = "proto3";
 
 package ivp.interface;
 
+import "interface/behaviors.proto";
 import "interface/options.proto";
 import "openocean/messages/common.proto";
 
@@ -26,8 +27,11 @@ import "openocean/messages/common.proto";
 // take pHelmIvP's defaults.
 message HelmConfig
 {
-    // .bhv files ("behaviors"), read in sorted order
+    // .bhv or .bhv.yml files ("behaviors"). Only .bhv files are read in
+    // sorted order, as pHelmIvP does; otherwise in the order given.
     repeated string behavior_file = 1;
+    // behaviors given here rather than in a file, read after behavior_file
+    repeated BehaviorSet behaviors = 8;
 
     message Domain
     {
