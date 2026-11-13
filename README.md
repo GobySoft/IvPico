@@ -57,7 +57,7 @@ ctest --test-dir build
 
 Contacts come in as `Navigation` with `self: false`, or as `NODE_REPORT` variables. The helm raises pContactMgrV20's alerts itself (configured in `helm.contact_manager`), so contact behaviors such as collision avoidance spawn without a separate contact manager.
 
-`launch/goby/alpha` runs the alpha mission against Goby's basic frontseat simulator, with OpenCPN as a chart display: see its [README](launch/goby/alpha/README.md).
+`launch/goby/alpha` runs the alpha mission against Goby's basic frontseat simulator, shown on Liaison's map: see its [README](launch/goby/alpha/README.md).
 
 
 ## License

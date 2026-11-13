@@ -43,10 +43,9 @@ apt_install "${packages[@]}"
 packages=(libopenocean-messages-dev libivp-helm-dev)
 if ${goby}; then
     # libgoby3-dev only recommends libais-dev and dccl5-compiler, but goby's CMake package
-    # links libais.so, and goby_add_app() runs protoc-gen-dccl. MOOS-IvP's apps
-    # (pMarineViewer for the Goby launches) need libmoos-ivp but don't depend on it
-    packages+=(libgoby3-dev goby3-apps libais-dev dccl5-compiler
-        libgoby3-moos-dev goby3-moos moos10-mit-db moos-ivp-apps moos-ivp-gui libmoos-ivp)
+    # links libais.so, and goby_add_app() runs protoc-gen-dccl. goby3-gui has goby_liaison,
+    # for the Goby launches' map
+    packages+=(libgoby3-dev goby3-apps goby3-gui libais-dev dccl5-compiler libgoby3-moos-dev)
 fi
 
 # Adds an apt.oceansoft.org channel to openocean_sources, checking its key's fingerprint
